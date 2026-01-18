@@ -1,13 +1,13 @@
-# ChatCade 🎮
+# GameBox 🎮
 
-**The Ultimate ChatGPT Game Arcade** - 5 addictive games in one ChatGPT app!
+**The Ultimate ChatGPT Game Collection** - 5 addictive games in one ChatGPT app!
 
-[![Project Status](https://img.shields.io/badge/status-in%20development-yellow)](https://github.com/ChadTimothy/chatcade)
+[![Project Status](https://img.shields.io/badge/status-in%20development-yellow)](https://github.com/ChadTimothy/gamebox)
 [![GitHub Project](https://img.shields.io/badge/project-board-blue)](https://github.com/users/ChadTimothy/projects/4)
 
-## What is ChatCade?
+## What is GameBox?
 
-ChatCade brings the most viral word games directly into ChatGPT with zero downloads and beautiful interactive widgets. Based on proven game mechanics with 5.3B+ annual plays worldwide, ChatCade combines:
+GameBox brings the most viral word games directly into ChatGPT with zero downloads and beautiful interactive widgets. Based on proven game mechanics with 5.3B+ annual plays worldwide, GameBox combines:
 
 - **Low-effort development** - Minimal complex UI, chat-native interaction
 - **High viral potential** - Proven game mechanics (Wordle, Connections, Spelling Bee)
@@ -68,7 +68,7 @@ Test your knowledge across multiple categories.
 ## Project Structure
 
 ```
-chatcade/
+gamebox/
 ├── server/              # MCP server (Node.js/TypeScript)
 │   ├── src/
 │   │   ├── index.ts    # Main MCP server
@@ -104,7 +104,7 @@ Track progress on our [GitHub Project Board](https://github.com/users/ChadTimoth
 
 ## Getting Started
 
-Documentation for local development coming soon. See [Epic #1](https://github.com/ChadTimothy/chatcade/issues/1) for setup tasks.
+Documentation for local development coming soon. See [Epic #1](https://github.com/ChadTimothy/gamebox/issues/1) for setup tasks.
 
 ### Prerequisites
 - Node.js 20+
@@ -116,8 +116,8 @@ Documentation for local development coming soon. See [Epic #1](https://github.co
 
 ```bash
 # Clone the repository
-git clone https://github.com/ChadTimothy/chatcade.git
-cd chatcade
+git clone https://github.com/ChadTimothy/gamebox.git
+cd gamebox
 
 # Install dependencies
 cd server && npm install
@@ -184,7 +184,7 @@ MIT License - see [LICENSE](./LICENSE) for details
 ## Contact
 
 - **GitHub**: [@ChadTimothy](https://github.com/ChadTimothy)
-- **Issues**: [GitHub Issues](https://github.com/ChadTimothy/chatcade/issues)
+- **Issues**: [GitHub Issues](https://github.com/ChadTimothy/gamebox/issues)
 - **Project Board**: [Development Progress](https://github.com/users/ChadTimothy/projects/4)
 
 ---

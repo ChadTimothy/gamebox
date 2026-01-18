@@ -1,10 +1,10 @@
-# Contributing to ChatCade
+# Contributing to GameBox
 
-Thank you for your interest in contributing to ChatCade! This document provides guidelines and the development process for contributing.
+Thank you for your interest in contributing to GameBox! This document provides guidelines and the development process for contributing.
 
 ## Development Process
 
-Each task in ChatCade follows a structured process called the "Ralph Loop" to ensure quality and consistency:
+Each task in GameBox follows a structured process called the "Ralph Loop" to ensure quality and consistency:
 
 ### 1. Read Ticket
 - Review the issue/task requirements thoroughly
@@ -173,4 +173,4 @@ Open an issue or discussion on GitHub - we're happy to help!
 
 ---
 
-Thank you for contributing to ChatCade! 🎮
+Thank you for contributing to GameBox! 🎮

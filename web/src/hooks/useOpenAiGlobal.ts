@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+/**
+ * Custom event type for OpenAI global updates.
+ */
+type SetGlobalsEvent = CustomEvent<{ globals: Record<string, any> }>;
+
+/**
+ * Event type dispatched when ChatGPT updates window.openai globals.
+ */
+const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
 
 /**
  * Base hook for accessing window.openai properties with reactive updates.
  *
- * This hook subscribes to changes in the window.openai global object
- * and updates the component when the specified property changes.
+ * This hook uses useSyncExternalStore to subscribe to changes in the
+ * window.openai global object via the "openai:set_globals" event.
+ * This is the official pattern recommended by OpenAI Apps SDK.
  *
  * @param key - The property key to access from window.openai
  * @returns The current value of window.openai[key]
@@ -16,29 +27,33 @@ import { useEffect, useState } from "react";
  * ```
  */
 export function useOpenAiGlobal<T>(key: string): T | undefined {
-  const [value, setValue] = useState<T>();
+  return useSyncExternalStore(
+    (onChange) => {
+      const handleSetGlobal = (event: Event) => {
+        const customEvent = event as SetGlobalsEvent;
+        const value = customEvent.detail?.globals?.[key];
 
-  useEffect(() => {
-    const checkValue = () => {
-      const openai = (window as any).openai;
-      const currentValue = openai?.[key];
-      setValue((prevValue) => {
-        // Only update if value actually changed
-        if (currentValue !== prevValue) {
-          return currentValue;
+        // Only trigger re-render if this specific key was updated
+        if (value === undefined) {
+          return;
         }
-        return prevValue;
+
+        onChange();
+      };
+
+      // Listen for ChatGPT's global update events
+      window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobal, {
+        passive: true,
       });
-    };
 
-    // Initial check
-    checkValue();
-
-    // Poll for changes (ChatGPT updates window.openai dynamically)
-    const interval = setInterval(checkValue, 100);
-
-    return () => clearInterval(interval);
-  }, [key]);
-
-  return value;
+      return () => {
+        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobal);
+      };
+    },
+    () => {
+      // Get current snapshot from window.openai
+      const openai = (window as any).openai;
+      return openai?.[key];
+    }
+  );
 }

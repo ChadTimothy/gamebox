@@ -21,9 +21,14 @@ export function useOpenAiGlobal<T>(key: string): T | undefined {
   useEffect(() => {
     const checkValue = () => {
       const openai = (window as any).openai;
-      if (openai?.[key] !== value) {
-        setValue(openai?.[key]);
-      }
+      const currentValue = openai?.[key];
+      setValue((prevValue) => {
+        // Only update if value actually changed
+        if (currentValue !== prevValue) {
+          return currentValue;
+        }
+        return prevValue;
+      });
     };
 
     // Initial check
@@ -33,7 +38,7 @@ export function useOpenAiGlobal<T>(key: string): T | undefined {
     const interval = setInterval(checkValue, 100);
 
     return () => clearInterval(interval);
-  }, [key, value]);
+  }, [key]);
 
   return value;
 }

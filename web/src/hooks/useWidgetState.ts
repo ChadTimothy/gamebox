@@ -1,15 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
+import { useOpenAiGlobal } from "./useOpenAiGlobal";
+
+/**
+ * Type for setState actions (value or updater function).
+ */
+type SetStateAction<T> = T | ((prev: T) => T);
 
 /**
  * Hook for managing persistent widget state that syncs with ChatGPT.
  *
- * Similar to React's useState, but automatically persists state changes
- * to ChatGPT via window.openai.setWidgetState(). State is restored when
- * the widget remounts.
+ * This hook uses the official OpenAI pattern:
+ * 1. Hydrates initial state from window.openai.widgetState (or defaultState)
+ * 2. Subscribes to future updates via useOpenAiGlobal("widgetState")
+ * 3. Mirrors writes back through window.openai.setWidgetState()
+ *
+ * This keeps the widget in sync even if multiple components mutate the same state.
  *
  * IMPORTANT: Keep state under 4k tokens to avoid truncation.
  *
- * @param initialState - The initial state value
+ * @param defaultState - The default state value or initializer function
  * @returns A tuple of [state, setState] similar to React.useState
  *
  * @example
@@ -39,39 +48,50 @@ import { useState, useEffect, useCallback } from "react";
  * ```
  */
 export function useWidgetState<T>(
-  initialState: T
-): [T, (state: T | ((prev: T) => T)) => void] {
-  const [state, setState] = useState<T>(initialState);
-  const [isHydrated, setIsHydrated] = useState(false);
+  defaultState: T | (() => T)
+): [T, (state: SetStateAction<T>) => void] {
+  // Subscribe to widgetState updates from ChatGPT
+  const widgetStateFromWindow = useOpenAiGlobal<T>("widgetState");
 
-  // Hydrate state from window.openai.widgetState on mount
-  useEffect(() => {
-    const openai = (window as any).openai;
-    if (openai?.widgetState) {
-      setState(openai.widgetState);
+  // Initialize local state
+  const [widgetState, _setWidgetState] = useState<T>(() => {
+    // Prioritize state from window.openai if available
+    if (widgetStateFromWindow != null) {
+      return widgetStateFromWindow;
     }
-    setIsHydrated(true);
-  }, []);
 
-  // Persist state to ChatGPT
+    // Otherwise use defaultState (or call it if it's a function)
+    return typeof defaultState === "function"
+      ? (defaultState as () => T)()
+      : defaultState;
+  });
+
+  // Sync with updates from window.openai
+  useEffect(() => {
+    if (widgetStateFromWindow != null) {
+      _setWidgetState(widgetStateFromWindow);
+    }
+  }, [widgetStateFromWindow]);
+
+  // Create setter that persists to ChatGPT
   const setWidgetState = useCallback(
-    (nextState: T | ((prev: T) => T)) => {
-      setState((prevState) => {
-        const computed =
-          typeof nextState === "function"
-            ? (nextState as (prev: T) => T)(prevState)
-            : nextState;
+    (state: SetStateAction<T>) => {
+      _setWidgetState((prevState) => {
+        const newState =
+          typeof state === "function" ? (state as (prev: T) => T)(prevState) : state;
 
-        // Persist to ChatGPT (only after hydration to avoid overwriting)
-        if (isHydrated && (window as any).openai?.setWidgetState) {
-          (window as any).openai.setWidgetState(computed);
+        // Persist to ChatGPT
+        const openai = (window as any).openai;
+        if (openai?.setWidgetState) {
+          openai.setWidgetState(newState);
         }
 
-        return computed;
+        return newState;
       });
     },
-    [isHydrated]
+    // Stable reference - setWidgetState function doesn't change
+    [(window as any).openai?.setWidgetState]
   );
 
-  return [state, setWidgetState];
+  return [widgetState, setWidgetState] as const;
 }

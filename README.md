@@ -56,14 +56,18 @@ Test your knowledge across multiple categories.
 ### Server (MCP)
 - **Runtime**: Node.js 20+ with TypeScript
 - **Framework**: Express.js
-- **Protocol**: MCP (Model Context Protocol) with SSE transport
+- **SDK**: `@openai/apps-sdk` (Official OpenAI Apps SDK)
+- **Transport**: `StreamableHTTPServerTransport`
 - **Database**: Supabase (PostgreSQL)
 
 ### Client (Widgets)
 - **Framework**: React 18 with TypeScript
+- **UI Library**: `@openai/apps-sdk-ui` (Official ChatGPT design system)
 - **Build Tool**: Vite
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS + Apps SDK UI tokens
 - **Hosting**: Fly.io + Cloudflare CDN
+
+**Note**: Technology stack updated based on [Official Apps SDK documentation review](./docs/TECHNICAL_REVIEW.md)
 
 ## Project Structure
 
@@ -92,8 +96,19 @@ gamebox/
 
 Track progress on our [GitHub Project Board](https://github.com/users/ChadTimothy/projects/4)
 
+### ⚠️ Technical Review Complete
+We've completed a comprehensive review against the [Official OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk). See [Technical Review](./docs/TECHNICAL_REVIEW.md) for details.
+
+**Critical Updates**:
+- ✅ Architecture validated
+- ⚠️ SDK package needs update (#44)
+- ⚠️ Transport layer needs update (#45)
+- ⚠️ UI components need SDK library (#46)
+- ⚠️ Widget hooks need implementation (#47)
+- ❌ CSP configuration required (#48)
+
 ### Epics
-- [ ] **Epic #1**: Project Setup & Infrastructure
+- [ ] **Epic #1**: Project Setup & Infrastructure (⚠️ updated with critical fixes)
 - [ ] **Epic #4**: Game 1 - Word Challenge
 - [ ] **Epic #11**: Game 2 - 20 Questions AI
 - [ ] **Epic #12**: Game 3 - Connections

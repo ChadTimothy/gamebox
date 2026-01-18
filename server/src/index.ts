@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { getWidgetMetadata } from "./config/csp.js";
 
 const PORT = Number(process.env.PORT ?? 8000);
 const MCP_PATH = "/mcp";
@@ -27,9 +28,7 @@ function createGameBoxServer() {
             <h1>GameBox</h1>
             <p>The Ultimate ChatGPT Game Collection</p>
           </div>`,
-          _meta: {
-            "openai/widgetPrefersBorder": true,
-          },
+          _meta: getWidgetMetadata(),
         },
       ],
     })

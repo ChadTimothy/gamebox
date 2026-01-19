@@ -16,7 +16,7 @@ test.describe('Widget Screenshots', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:4444/');
-    await page.waitForSelector('h1:has-text("Word Challenge")');
+    await page.waitForSelector('h1:has-text("Word Morph")');
   });
 
   test('capture widget initial state', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('Widget Screenshots', () => {
   test('capture widget on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('http://localhost:4444/');
-    await page.waitForSelector('h1:has-text("Word Challenge")');
+    await page.waitForSelector('h1:has-text("Word Morph")');
     await page.screenshot({
       path: 'testing/screenshots/widget-mobile.png',
       fullPage: true

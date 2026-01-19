@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 /**
- * Word Challenge Widget UI Tests
+ * Word Morph Widget UI Tests
  *
  * Visual and interaction testing of the widget itself.
  * Tests the React component rendering, styling, and user interactions.
@@ -19,15 +19,15 @@ const typeLetters = async (page: Page, letters: string) => {
   }
 };
 
-test.describe('Word Challenge Widget UI', () => {
+test.describe('Word Morph Widget UI', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:4444/');
-    await page.waitForSelector('h1:has-text("Word Challenge")');
+    await page.waitForSelector('h1:has-text("Word Morph")');
   });
 
   test('should render the game title', async ({ page }) => {
-    const title = page.locator('h1:has-text("Word Challenge")');
+    const title = page.locator('h1:has-text("Word Morph")');
     await expect(title).toBeVisible();
     await expect(title).toHaveClass(/font-bold/);
   });
@@ -124,13 +124,13 @@ test.describe('Word Challenge Widget UI', () => {
 
   test('should be responsive on mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await expect(page.getByRole('heading', { name: 'Word Challenge' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Word Morph' })).toBeVisible();
     await expect(getTiles(page).first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Q', exact: true })).toBeVisible();
   });
 
   test('should have proper text styling', async ({ page }) => {
-    const title = page.getByRole('heading', { name: 'Word Challenge' });
+    const title = page.getByRole('heading', { name: 'Word Morph' });
     const fontSize = await title.evaluate((el) => window.getComputedStyle(el).fontSize);
     const fontWeight = await title.evaluate((el) => window.getComputedStyle(el).fontWeight);
 

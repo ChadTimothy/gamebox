@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Word Challenge E2E Tests
+ * Word Morph E2E Tests
  *
- * These tests verify the Word Challenge MCP server functionality
+ * These tests verify the Word Morph MCP server functionality
  * by making JSON-RPC calls to the /mcp endpoint.
  */
 
@@ -30,7 +30,7 @@ async function mcpCall(request: any, method: string, params?: any) {
   return response;
 }
 
-test.describe('Word Challenge MCP Server', () => {
+test.describe('Word Morph MCP Server', () => {
 
   test('should respond to health check', async ({ request }) => {
     const response = await request.get('/');
@@ -41,7 +41,7 @@ test.describe('Word Challenge MCP Server', () => {
     expect(text).toContain('GameBox MCP Server');
   });
 
-  test('should register all Word Challenge tools', async ({ request }) => {
+  test('should register all Word Morph tools', async ({ request }) => {
     const response = await mcpCall(request, 'tools/list');
 
     expect(response.ok()).toBeTruthy();
@@ -53,22 +53,22 @@ test.describe('Word Challenge MCP Server', () => {
 
     // Check for specific tools
     const toolNames = data.result.tools.map((t: any) => t.name);
-    expect(toolNames).toContain('start_word_challenge');
-    expect(toolNames).toContain('check_word_guess');
+    expect(toolNames).toContain('start_word_morph');
+    expect(toolNames).toContain('check_word_morph_guess');
     expect(toolNames).toContain('show_game_menu');
 
     // Check tool metadata
-    const wordChallengeTool = data.result.tools.find((t: any) => t.name === 'start_word_challenge');
-    expect(wordChallengeTool.title).toBe('Start Word Challenge');
+    const wordChallengeTool = data.result.tools.find((t: any) => t.name === 'start_word_morph');
+    expect(wordChallengeTool.title).toBe('Start Word Morph');
     expect(wordChallengeTool._meta).toBeDefined();
-    expect(wordChallengeTool._meta['openai/outputTemplate']).toBe('ui://widget/word-challenge.html');
+    expect(wordChallengeTool._meta['openai/outputTemplate']).toBe('ui://widget/word-morph.html');
   });
 
   test.describe('Daily Mode', () => {
 
-    test('should start a daily Word Challenge game', async ({ request }) => {
+    test('should start a daily Word Morph game', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'daily' },
       });
 
@@ -78,7 +78,7 @@ test.describe('Word Challenge MCP Server', () => {
       expect(data.result).toBeDefined();
       expect(data.result.content).toBeDefined();
       expect(data.result.content[0].type).toBe('text');
-      expect(data.result.content[0].text).toContain('Daily Word Challenge started');
+      expect(data.result.content[0].text).toContain('Daily Word Morph started');
 
       // Check structured content
       const structuredContent = data.result.structuredContent;
@@ -96,7 +96,7 @@ test.describe('Word Challenge MCP Server', () => {
     test('should give consistent daily word', async ({ request }) => {
       // Start first game
       const response1 = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'daily' },
       });
       const data1 = await response1.json();
@@ -104,7 +104,7 @@ test.describe('Word Challenge MCP Server', () => {
 
       // Start second game
       const response2 = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'daily' },
       });
       const data2 = await response2.json();
@@ -121,16 +121,16 @@ test.describe('Word Challenge MCP Server', () => {
 
   test.describe('Practice Mode', () => {
 
-    test('should start a practice Word Challenge game', async ({ request }) => {
+    test('should start a practice Word Morph game', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'practice' },
       });
 
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
 
-      expect(data.result.content[0].text).toContain('Practice Word Challenge started');
+      expect(data.result.content[0].text).toContain('Practice Word Morph started');
       expect(data.result.structuredContent.mode).toBe('practice');
       expect(data.result.structuredContent.status).toBe('playing');
     });
@@ -142,7 +142,7 @@ test.describe('Word Challenge MCP Server', () => {
     test.beforeEach(async ({ request }) => {
       // Start a new game before each test
       const response = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'practice' },
       });
       const data = await response.json();
@@ -151,7 +151,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should accept valid 5-letter guess', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId,
           guess: 'crane',
@@ -184,7 +184,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should reject guess that is too short', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId,
           guess: 'cat',
@@ -201,7 +201,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should reject guess that is too long', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId,
           guess: 'cranes',
@@ -217,7 +217,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should reject guess with numbers', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId,
           guess: '12345',
@@ -233,7 +233,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should handle lowercase guesses correctly', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId,
           guess: 'hello',
@@ -254,7 +254,7 @@ test.describe('Word Challenge MCP Server', () => {
 
       for (let i = 0; i < guessWords.length; i++) {
         const response = await mcpCall(request, 'tools/call', {
-          name: 'check_word_guess',
+          name: 'check_word_morph_guess',
           arguments: {
             gameId,
             guess: guessWords[i],
@@ -274,7 +274,7 @@ test.describe('Word Challenge MCP Server', () => {
 
     test('should reject guesses for non-existent game', async ({ request }) => {
       const response = await mcpCall(request, 'tools/call', {
-        name: 'check_word_guess',
+        name: 'check_word_morph_guess',
         arguments: {
           gameId: 'non_existent_game_id',
           guess: 'crane',
@@ -294,7 +294,7 @@ test.describe('Word Challenge MCP Server', () => {
     test('should detect when game is lost (max guesses reached)', async ({ request }) => {
       // Start a new game
       const startResponse = await mcpCall(request, 'tools/call', {
-        name: 'start_word_challenge',
+        name: 'start_word_morph',
         arguments: { mode: 'practice' },
       });
       const startData = await startResponse.json();
@@ -306,7 +306,7 @@ test.describe('Word Challenge MCP Server', () => {
 
       for (const word of guessWords) {
         const response = await mcpCall(request, 'tools/call', {
-          name: 'check_word_guess',
+          name: 'check_word_morph_guess',
           arguments: {
             gameId,
             guess: word,
@@ -342,12 +342,12 @@ test.describe('Word Challenge MCP Server', () => {
       expect(data.result.structuredContent.games).toBeDefined();
       expect(data.result.structuredContent.games.length).toBeGreaterThan(0);
 
-      // Check for Word Challenge in the menu
+      // Check for Word Morph in the menu
       const wordChallengeGame = data.result.structuredContent.games.find(
-        (g: any) => g.id === 'word-challenge'
+        (g: any) => g.id === 'word-morph'
       );
       expect(wordChallengeGame).toBeDefined();
-      expect(wordChallengeGame.name).toBe('Word Challenge');
+      expect(wordChallengeGame.name).toBe('Word Morph');
     });
   });
 });

@@ -37,13 +37,29 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'chromium-widget',
+      testMatch: '**/widget-*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://localhost:4444',
+      },
+    },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'cd server && npm run dev',
-    url: 'http://localhost:8000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  /* Run your local dev servers before starting the tests */
+  webServer: [
+    {
+      command: 'cd server && npm run dev',
+      url: 'http://localhost:8000',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+    {
+      command: 'cd web && npm run dev',
+      url: 'http://localhost:4444',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+  ],
 });

@@ -1,0 +1,45 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - heading "Word Challenge" [level=1] [ref=e4]
+  - generic [ref=e6]: Guess 1 of 6
+  - generic [ref=e8]:
+    - generic [ref=e9]: C
+    - generic [ref=e10]: R
+    - generic [ref=e11]: A
+    - generic [ref=e12]: E
+    - generic [ref=e13]: S
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - button "Q" [ref=e16]
+      - button "W" [ref=e17]
+      - button "E" [ref=e18]
+      - button "R" [ref=e19]
+      - button "T" [ref=e20]
+      - button "Y" [ref=e21]
+      - button "U" [ref=e22]
+      - button "I" [ref=e23]
+      - button "O" [ref=e24]
+      - button "P" [ref=e25]
+    - generic [ref=e26]:
+      - button "A" [ref=e27]
+      - button "S" [active] [ref=e28]
+      - button "D" [ref=e29]
+      - button "F" [ref=e30]
+      - button "G" [ref=e31]
+      - button "H" [ref=e32]
+      - button "J" [ref=e33]
+      - button "K" [ref=e34]
+      - button "L" [ref=e35]
+    - generic [ref=e36]:
+      - button "ENTER" [ref=e37]
+      - button "Z" [ref=e38]
+      - button "X" [ref=e39]
+      - button "C" [ref=e40]
+      - button "V" [ref=e41]
+      - button "B" [ref=e42]
+      - button "N" [ref=e43]
+      - button "M" [ref=e44]
+      - button "⌫" [ref=e45]
+```

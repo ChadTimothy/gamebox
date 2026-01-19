@@ -138,17 +138,16 @@ Hardest category: 🟪 "Anagrams of colors"
 
 ### 🤖 Agent Enhancements
 
-#### **1. Medieval Blacksmith Narrative**
-ChatGPT roleplays as a master blacksmith:
+#### **1. Smart Discovery Coach**
+ChatGPT guides you with clean, encouraging feedback:
 ```
-⚒️ Master Smith: "Ah, another apprentice! Today we forge words from
-these letters: S-T-R-O-N-G-E. The center anvil demands the letter R
-in every word. Show me your skill!"
+💡 "Nice start! You've found 8 words using these letters: S-T-R-O-N-G-E
+   (center: R). Keep going - there are 23 more possibilities."
 
 [User finds: STRONG, STONER, GONERS]
 
-⚒️ "Impressive work! But I sense you've yet to discover the legendary
-STRONGEST blade - a pangram worthy of a master smith!"
+💡 "Great progress! You're at 11/31 words. There's still a pangram
+   hiding in there - a word that uses all 7 letters."
 ```
 
 #### **2. Progressive Hint System**
@@ -168,9 +167,9 @@ Hint 4 ($3): Shows word list sorted by length with blanks:
 When you find a word, ChatGPT provides context:
 ```
 You found: ERGOT
-💭 "A fungus that grows on grain! In medieval times, ergot poisoning
-caused hallucinations and was called 'St. Anthony's Fire.' Dark history
-for a simple word!"
+💭 "A fungus that grows on grain. Ergot poisoning can cause
+hallucinations and was historically responsible for mass hysteria
+events. Fascinating word with unexpected history!"
 ```
 
 #### **4. Themed Challenges**
@@ -184,11 +183,12 @@ Pangram: STEWARD, WASTERS
 
 ### 🎨 UI Enhancements
 
-#### **Forge Visualization**
-- Letters appear on an anvil
-- Words you create get "forged" with hammer animation
-- Pangrams create epic sword/shield graphics
-- Progress bar shows % of total words found
+#### **Clean Letter Display**
+- Letters arranged in a modern circular pattern
+- Center letter highlighted with accent color (teal)
+- Words you create appear with smooth fade-in animations
+- Pangrams trigger a satisfying burst of confetti
+- Progress bar shows % of total words found with clean minimalist design
 
 #### **Word Length Honeycomb**
 Visual grid showing word counts by length:
@@ -209,17 +209,17 @@ Shows which letter combinations you haven't tried:
 
 ### 🎮 Game Modes
 
-#### **Daily Forge**
+#### **Daily Challenge**
 - Everyone works on the same letters
 - Compare word discovery order
 - Compete for fastest pangram
 
-#### **Speed Smith**
+#### **Speed Mode**
 - 2-minute timer
-- How many words can you forge?
+- How many words can you find?
 - Bonus points for rare words
 
-#### **Cooperative Forge**
+#### **Cooperative Mode**
 - Team mode: Share discovered words
 - Race against another team
 - Combine vocabularies for maximum coverage

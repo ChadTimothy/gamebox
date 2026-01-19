@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from "zod";
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordMorphGame } from "./games/wordMorph.js";
@@ -31,7 +31,7 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const DAYS_PER_YEAR = 365;
 
 // Widget URLs - use same server for both MCP and widget assets
-const WIDGET_BASE_URL = process.env.WIDGET_BASE_URL ?? "https://word-challenge.fly.dev";
+const WIDGET_BASE_URL = process.env.WIDGET_BASE_URL ?? "https://word-morph.fly.dev";
 const WIDGET_VERSION = Date.now(); // Cache buster
 
 // MIME types for static file serving
@@ -56,7 +56,7 @@ interface GameSession {
 
 /**
  * In-memory game state storage.
- * Maps session IDs to active WordChallenge game sessions.
+ * Maps session IDs to active Word Morph game sessions.
  */
 const activeGames = new Map<string, GameSession>();
 
@@ -150,15 +150,15 @@ function generateWordClue(word: string): string {
 }
 
 /**
- * Generate the Word Challenge widget HTML.
+ * Generate the Word Morph widget HTML.
  */
-function getWordChallengeWidgetHtml(): string {
+function getWordMorphWidgetHtml(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Word Challenge</title>
+  <title>Word Morph</title>
   <script type="module" crossorigin src="${WIDGET_BASE_URL}/assets/index.js?v=${WIDGET_VERSION}"></script>
   <link rel="stylesheet" crossorigin href="${WIDGET_BASE_URL}/assets/index.css?v=${WIDGET_VERSION}">
 </head>
@@ -175,17 +175,17 @@ function createGameBoxServer(): McpServer {
     version: "0.1.0",
   });
 
-  // Register Word Challenge widget resource
+  // Register Word Morph widget resource
   server.registerResource(
-    "word-challenge-widget",
-    "ui://widget/word-challenge.html",
+    "word-morph-widget",
+    "ui://widget/word-morph.html",
     {},
     async () => ({
       contents: [
         {
-          uri: "ui://widget/word-challenge.html",
+          uri: "ui://widget/word-morph.html",
           mimeType: "text/html+skybridge",
-          text: getWordChallengeWidgetHtml(),
+          text: getWordMorphWidgetHtml(),
           _meta: getWidgetMetadata(),
         },
       ],
@@ -213,11 +213,12 @@ function createGameBoxServer(): McpServer {
   );
 
   // Tool schemas
-  const startWordChallengeSchema = z.object({
+  // Zod schemas for runtime validation
+  const startWordMorphSchema = z.object({
     mode: z.enum(["daily", "practice"]).optional().default("daily"),
   });
 
-  const checkWordGuessSchema = z.object({
+  const checkWordMorphGuessSchema = z.object({
     gameId: z.string(),
     guess: z
       .string()
@@ -226,33 +227,75 @@ function createGameBoxServer(): McpServer {
       .transform((s) => s.toUpperCase()),
   });
 
-  const getWordHintSchema = z.object({
+  const getWordMorphHintSchema = z.object({
     gameId: z.string(),
   });
 
+  // JSON Schema definitions for ChatGPT App Store compliance
+  const startWordMorphJsonSchema = {
+    type: "object",
+    properties: {
+      mode: {
+        type: "string",
+        enum: ["daily", "practice"],
+        default: "daily",
+        description: "Game mode: 'daily' for the daily challenge word, 'practice' for a random word"
+      }
+    }
+  };
+
+  const checkWordMorphGuessJsonSchema = {
+    type: "object",
+    properties: {
+      gameId: {
+        type: "string",
+        description: "The game session ID returned from start_word_morph"
+      },
+      guess: {
+        type: "string",
+        minLength: 5,
+        maxLength: 5,
+        pattern: "^[A-Za-z]{5}$",
+        description: "A 5-letter word guess (case-insensitive, will be converted to uppercase)"
+      }
+    },
+    required: ["gameId", "guess"]
+  };
+
+  const getWordMorphHintJsonSchema = {
+    type: "object",
+    properties: {
+      gameId: {
+        type: "string",
+        description: "The game session ID returned from start_word_morph"
+      }
+    },
+    required: ["gameId"]
+  };
+
   /**
-   * Start a new Word Challenge game.
+   * Start a new Word Morph game.
    */
   server.registerTool(
-    "gamebox.start_word_challenge",
+    "gamebox.start_word_morph",
     {
-      title: "Start Word Challenge Game",
+      title: "Start Word Morph Game",
       description:
-        "Use this when the user explicitly asks to play Word Challenge, use the Word Challenge connector, or launch the Word Challenge app. This is a Wordle-style 5-letter word guessing game with a visual widget interface. Do NOT use for general word games - only when the user specifically mentions Word Challenge or asks to use this connector.",
-      inputSchema: startWordChallengeSchema as any,
+        "Use this when the user explicitly asks to play Word Morph, use the Word Morph connector, or launch the Word Morph app. This is a unique word transformation puzzle where users guess 5-letter words and receive feedback (teal = correct position, coral = wrong position, slate = not in word). Do NOT use for general word games, Wordle, or other word-related tasks - only when the user specifically mentions Word Morph or asks to use this connector.",
+      inputSchema: startWordMorphJsonSchema as any,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
         destructiveHint: false,
       },
       _meta: {
-        "openai/outputTemplate": "ui://widget/word-challenge.html",
-        "openai/toolInvocation/invoking": "Starting Word Challenge",
-        "openai/toolInvocation/invoked": "Word Challenge ready! Make your first guess.",
+        "openai/outputTemplate": "ui://widget/word-morph.html",
+        "openai/toolInvocation/invoking": "Starting Word Morph",
+        "openai/toolInvocation/invoked": "Word Morph ready! Make your first guess.",
       },
     },
     async (params: unknown) => {
-      const { mode } = startWordChallengeSchema.parse(params);
+      const { mode } = startWordMorphSchema.parse(params);
       const userId = DEFAULT_USER_ID;
 
       const streakData = await loadStreakData(userId);
@@ -274,19 +317,19 @@ function createGameBoxServer(): McpServer {
 
       // Build welcome message with rules and available tools
       const welcomeMessage = `
-🎯 ${modeLabel} Word Challenge Started!
+🎯 ${modeLabel} Word Morph Started!
 
 **Game Rules:**
 - Guess the 5-letter word in 6 tries
 - Each guess must be a valid 5-letter word
 - After each guess, tiles show feedback:
-  🟩 Green = letter is correct and in the right position
-  🟨 Yellow = letter is in the word but wrong position
-  ⬜ Gray = letter is not in the word
+  🟦 Teal = letter is correct and in the right position
+  🟧 Coral = letter is in the word but wrong position
+  ⬜ Slate = letter is not in the word
 
 **Available Tools:**
-- \`gamebox.check_word_guess\` - Submit a 5-letter word guess
-- \`gamebox.get_word_hint\` - Get a cryptic clue about the word (turn it into a challenging riddle for the user!)
+- \`gamebox.check_word_morph_guess\` - Submit a 5-letter word guess
+- \`gamebox.get_word_morph_hint\` - Get a cryptic clue about the word (turn it into a challenging riddle for the user!)
 
 **Your Stats:**
 - Current Streak: ${streakData.currentStreak}
@@ -315,30 +358,30 @@ Make your first guess, or ask for a hint!
   );
 
   /**
-   * Make a guess in the active Word Challenge game.
+   * Make a guess in the active Word Morph game.
    */
   server.registerTool(
-    "gamebox.check_word_guess",
+    "gamebox.check_word_morph_guess",
     {
-      title: "Submit Word Challenge Guess",
+      title: "Submit Word Morph Guess",
       description:
-        "Use this to submit a 5-letter word guess in an active Word Challenge game session. Only use after gamebox.start_word_challenge has been called. Updates the game state with feedback on correct, present, or absent letters.",
-      inputSchema: checkWordGuessSchema as any,
+        "Use this to submit a 5-letter word guess in an active Word Morph game session. Only use after gamebox.start_word_morph has been called. Updates the game state with feedback on correct, present, or absent letters.",
+      inputSchema: checkWordMorphGuessJsonSchema as any,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
         destructiveHint: false,
       },
       _meta: {
-        "openai/outputTemplate": "ui://widget/word-challenge.html",
+        "openai/outputTemplate": "ui://widget/word-morph.html",
       },
     },
     async (params: unknown) => {
-      const { gameId, guess } = checkWordGuessSchema.parse(params);
+      const { gameId, guess } = checkWordMorphGuessSchema.parse(params);
 
       const session = activeGames.get(gameId);
       if (!session) {
-        return createErrorResponse("Game not found. Please start a new game with start_word_challenge.");
+        return createErrorResponse("Game not found. Please start a new game with start_word_morph.");
       }
 
       const { game, mode, userId } = session;
@@ -384,23 +427,23 @@ Make your first guess, or ask for a hint!
    * Get a hint about the target word.
    */
   server.registerTool(
-    "gamebox.get_word_hint",
+    "gamebox.get_word_morph_hint",
     {
-      title: "Get Word Challenge Hint",
+      title: "Get Word Morph Hint",
       description:
-        "Use this when the user asks for a hint, clue, or help in an active Word Challenge game. Returns cryptic clues about the target word's letters and structure. IMPORTANT: Transform these clues into a challenging, creative riddle for the user - don't just repeat the raw clues!",
-      inputSchema: getWordHintSchema as any,
+        "Use this when the user asks for a hint, clue, or help in an active Word Morph game. Returns cryptic clues about the target word's letters and structure. IMPORTANT: Transform these clues into a challenging, creative riddle for the user - don't just repeat the raw clues!",
+      inputSchema: getWordMorphHintJsonSchema as any,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
         destructiveHint: false,
       },
       _meta: {
-        "openai/outputTemplate": "ui://widget/word-challenge.html",
+        "openai/outputTemplate": "ui://widget/word-morph.html",
       },
     },
     async (params: unknown) => {
-      const { gameId } = getWordHintSchema.parse(params);
+      const { gameId } = getWordMorphHintSchema.parse(params);
 
       // Validate game session exists
       const session = activeGames.get(gameId);
@@ -453,7 +496,7 @@ Transform the above clues into a challenging, creative riddle that makes the use
       title: "Show GameBox Menu",
       description:
         "Use this when the user explicitly asks to see the GameBox menu, browse GameBox games, or asks what games are available in GameBox. Displays the game selection menu. Do NOT use for general game queries - only when user mentions GameBox specifically.",
-      inputSchema: z.object({}) as any,
+      inputSchema: { type: "object", properties: {} } as any,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -469,11 +512,11 @@ Transform the above clues into a challenging, creative riddle that makes the use
       content: [textContent("Welcome to GameBox!")],
       structuredContent: {
         games: [
-          { id: "word-challenge", name: "Word Challenge" },
-          { id: "20-questions", name: "20 Questions" },
-          { id: "connections", name: "Connections" },
-          { id: "spelling-bee", name: "Spelling Bee" },
-          { id: "trivia", name: "Trivia Challenge" },
+          { id: "word-morph", name: "Word Morph" },
+          { id: "twenty-queries", name: "Twenty Queries" },
+          { id: "kinship", name: "Kinship" },
+          { id: "lexicon-smith", name: "Lexicon Smith" },
+          { id: "lore-master", name: "Lore Master" },
         ],
       },
     })
@@ -513,17 +556,133 @@ function handleHealthCheckRequest(res: ServerResponse): void {
 }
 
 /**
+ * Handle OpenAI Apps Challenge endpoint.
+ * Required for ChatGPT App Store verification.
+ */
+function handleOpenAIAppsChallenge(res: ServerResponse): void {
+  res.writeHead(200, {
+    "content-type": "application/json",
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.end(JSON.stringify({
+    status: "verified",
+    name: "GameBox",
+    version: "0.1.0"
+  }));
+}
+
+/**
+ * Handle privacy policy endpoint.
+ * Required for ChatGPT App Store compliance.
+ */
+function handlePrivacyPolicy(res: ServerResponse): void {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - GameBox</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+    h1 { color: #333; }
+    h2 { color: #555; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p><strong>Last Updated:</strong> ${new Date().toISOString().split('T')[0]}</p>
+
+  <h2>Overview</h2>
+  <p>GameBox is a collection of word and puzzle games for ChatGPT. We are committed to protecting your privacy.</p>
+
+  <h2>Data Collection</h2>
+  <p>GameBox collects minimal data necessary for game functionality:</p>
+  <ul>
+    <li>Game session data (in-memory only, not persisted)</li>
+    <li>Game statistics (win streaks, scores)</li>
+    <li>No personal information is collected</li>
+  </ul>
+
+  <h2>Data Storage</h2>
+  <p>All game data is stored temporarily in memory during your session. No data is permanently stored or shared with third parties.</p>
+
+  <h2>Contact</h2>
+  <p>For questions about this privacy policy, please contact us through the GitHub repository.</p>
+</body>
+</html>`;
+
+  res.writeHead(200, {
+    "content-type": "text/html",
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.end(html);
+}
+
+/**
+ * Handle terms of service endpoint.
+ * Required for ChatGPT App Store compliance.
+ */
+function handleTermsOfService(res: ServerResponse): void {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service - GameBox</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+    h1 { color: #333; }
+    h2 { color: #555; margin-top: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Terms of Service</h1>
+  <p><strong>Last Updated:</strong> ${new Date().toISOString().split('T')[0]}</p>
+
+  <h2>Acceptance of Terms</h2>
+  <p>By accessing and using GameBox, you accept and agree to be bound by these Terms of Service.</p>
+
+  <h2>Description of Service</h2>
+  <p>GameBox provides word and puzzle games accessible through ChatGPT. The service is provided "as is" without warranties.</p>
+
+  <h2>Game Content</h2>
+  <p>All games are original implementations. Word lists are derived from public domain sources.</p>
+
+  <h2>User Conduct</h2>
+  <p>Users agree to:</p>
+  <ul>
+    <li>Use the service for its intended gaming purpose</li>
+    <li>Not attempt to exploit or disrupt the service</li>
+    <li>Not violate any applicable laws</li>
+  </ul>
+
+  <h2>Limitation of Liability</h2>
+  <p>GameBox is provided for entertainment purposes. We are not liable for any damages arising from use of the service.</p>
+
+  <h2>Changes to Terms</h2>
+  <p>We reserve the right to modify these terms at any time. Continued use constitutes acceptance of modified terms.</p>
+
+  <h2>Contact</h2>
+  <p>For questions about these terms, please contact us through the GitHub repository.</p>
+</body>
+</html>`;
+
+  res.writeHead(200, {
+    "content-type": "text/html",
+    "Access-Control-Allow-Origin": "*"
+  });
+  res.end(html);
+}
+
+/**
  * Handle MCP protocol requests.
  */
-async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcpRequest(_req: IncomingMessage, res: ServerResponse): Promise<void> {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
   const server = createGameBoxServer();
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
+  const transport = new SSEServerTransport("/mcp/sse", res);
 
   res.on("close", () => {
     transport.close();
@@ -532,7 +691,6 @@ async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Prom
 
   try {
     await server.connect(transport);
-    await transport.handleRequest(req, res);
   } catch (error) {
     console.error("Error handling MCP request:", error);
     if (!res.headersSent) {
@@ -593,6 +751,24 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise
   // Health check
   if (req.method === "GET" && url.pathname === "/") {
     handleHealthCheckRequest(res);
+    return;
+  }
+
+  // OpenAI Apps Challenge endpoint
+  if (req.method === "GET" && url.pathname === "/.well-known/openai-apps-challenge") {
+    handleOpenAIAppsChallenge(res);
+    return;
+  }
+
+  // Privacy policy endpoint
+  if (req.method === "GET" && url.pathname === "/privacy") {
+    handlePrivacyPolicy(res);
+    return;
+  }
+
+  // Terms of service endpoint
+  if (req.method === "GET" && url.pathname === "/terms") {
+    handleTermsOfService(res);
     return;
   }
 

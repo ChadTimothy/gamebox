@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useOpenAiGlobal } from "./useOpenAiGlobal";
 
 /**
@@ -53,6 +53,9 @@ export function useWidgetState<T>(
   // Subscribe to widgetState updates from ChatGPT
   const widgetStateFromWindow = useOpenAiGlobal<T>("widgetState");
 
+  // Track if we're currently updating to prevent circular updates
+  const isUpdatingRef = useRef(false);
+
   // Initialize local state
   const [widgetState, _setWidgetState] = useState<T>(() => {
     // Prioritize state from window.openai if available
@@ -66,9 +69,9 @@ export function useWidgetState<T>(
       : defaultState;
   });
 
-  // Sync with updates from window.openai
+  // Sync with updates from window.openai (only if we didn't cause the update)
   useEffect(() => {
-    if (widgetStateFromWindow != null) {
+    if (widgetStateFromWindow != null && !isUpdatingRef.current) {
       _setWidgetState(widgetStateFromWindow);
     }
   }, [widgetStateFromWindow]);
@@ -80,17 +83,26 @@ export function useWidgetState<T>(
         const newState =
           typeof state === "function" ? (state as (prev: T) => T)(prevState) : state;
 
-        // Persist to ChatGPT
+        // Persist to ChatGPT with a flag to prevent echo
+        isUpdatingRef.current = true;
         const openai = (window as any).openai;
         if (openai?.setWidgetState) {
-          openai.setWidgetState(newState);
+          try {
+            openai.setWidgetState(newState);
+          } catch (error) {
+            console.error("Error persisting widget state:", error);
+          }
         }
+
+        // Reset flag on next tick
+        queueMicrotask(() => {
+          isUpdatingRef.current = false;
+        });
 
         return newState;
       });
     },
-    // Stable reference - setWidgetState function doesn't change
-    [(window as any).openai?.setWidgetState]
+    []
   );
 
   return [widgetState, setWidgetState] as const;

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Challenge Widget - Test Harness</title>
+  <script type="module">
+    // Simple test harness to render the Word Challenge widget for Playwright testing
+    import { WordChallenge } from './src/widgets/WordChallenge.tsx';
+    import { createRoot } from 'react-dom/client';
+    import { createElement } from 'react';
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(createElement(WordChallenge));
+  </script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #root { width: 100%; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>

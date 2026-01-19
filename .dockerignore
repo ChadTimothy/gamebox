@@ -1,0 +1,38 @@
+# Node modules
+**/node_modules
+**/dist
+
+# Testing
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/coverage
+**/.vitest
+**/playwright-report
+**/test-results
+**/testing
+
+# Development
+**/.git
+**/.gitignore
+**/.env
+**/.env.*
+**/nodemon.json
+**/*.log
+**/tmp
+
+# Documentation
+**/README.md
+**/docs
+**/CONTRIBUTING.md
+
+# IDE
+**/.vscode
+**/.idea
+**/*.swp
+**/*.swo
+
+# OS
+.DS_Store
+Thumbs.db

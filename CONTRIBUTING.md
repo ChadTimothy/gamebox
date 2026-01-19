@@ -113,7 +113,7 @@ This is the iterative development cycle:
 
 Example:
 ```
-feat(word-challenge): implement daily word selection
+feat(word-morph): implement daily word selection
 
 - Add deterministic date-based word selection
 - Ensure same word for all users on same day
@@ -157,13 +157,73 @@ Track progress on our [GitHub Project Board](https://github.com/users/ChadTimoth
 Work is organized into epics (large features) and tasks (individual work items):
 
 - **Epic #1**: Project Setup & Infrastructure
-- **Epic #4**: Game 1 - Word Challenge
-- **Epic #11**: Game 2 - 20 Questions AI
-- **Epic #12**: Game 3 - Connections
-- **Epic #13**: Game 4 - Spelling Bee
-- **Epic #14**: Game 5 - Trivia Challenge
+- **Epic #4**: Game 1 - Word Morph (formerly Word Challenge)
+- **Epic #11**: Game 2 - Twenty Queries (formerly 20 Questions AI)
+- **Epic #12**: Game 3 - Kinship (formerly Connections)
+- **Epic #13**: Game 4 - Lexicon Smith (formerly Spelling Bee)
+- **Epic #14**: Game 5 - Lore Master (formerly Trivia Challenge)
 - **Epic #15**: Integration & Polish
 - **Epic #16**: Testing & Deployment
+- **Epic #17**: Legal Safety Game Rebranding ✅
+
+### Epic #17: Legal Safety Game Rebranding
+
+Comprehensive rebranding of all 5 games for legal compliance and trademark safety. This epic includes renaming all games to avoid trademark conflicts with NYT Games, updating visual designs to be legally distinct, and creating migration documentation.
+
+**Status**: ✅ Complete (Issues created, ready for implementation)
+
+**Phases**:
+1. **Planning & Design** (Tasks #17.1-17.3)
+   - Rebranding specification
+   - Codebase audit
+   - Visual design differentiation
+
+2. **Backend Refactoring** (Tasks #17.4-17.7)
+   - Backend module renaming
+   - MCP tool ID updates
+   - Visual design configuration
+   - Backend documentation
+
+3. **Frontend Refactoring** (Tasks #17.8-17.11)
+   - Frontend component renaming
+   - Visual design implementation
+   - Tool integration updates
+   - Frontend documentation
+
+4. **Apps SDK Compliance** (Tasks #17.17-17.20) ⚡ CRITICAL
+   - Dark mode support (CRITICAL - blocks App Store)
+   - Widget state persistence (CRITICAL - blocks App Store)
+   - Apps SDK UI integration (HIGH - strongly recommended)
+   - Picture-in-Picture mode (MEDIUM - recommended)
+
+5. **Testing & Documentation** (Tasks #17.12-17.16)
+   - E2E test updates
+   - Screenshot baseline regeneration
+   - Project documentation updates
+   - Final verification
+   - Migration guide creation
+
+**Key Changes**:
+- Word Challenge → Word Morph
+- Connections → Kinship
+- Spelling Bee → Lexicon Smith
+- 20 Questions → Twenty Queries
+- Trivia Challenge → Lore Master
+
+**Breaking Changes**:
+- Tool IDs updated (e.g., `gamebox.start_word_morph` instead of `gamebox.start_word_challenge`)
+- Widget URIs updated (e.g., `ui://widget/word-morph.html`)
+- Visual design differentiated (teal/coral/slate colors instead of green/yellow/gray)
+
+**Apps SDK Requirements** (NEW):
+- Dark mode support mandatory (light + dark themes)
+- Widget state persistence via `window.openai.setWidgetState()`
+- Apps SDK UI components recommended
+- Picture-in-Picture mode recommended
+
+**Timeline**: 34-42 hours total (24-28 rebranding + 10-14 Apps SDK compliance)
+
+**Migration**: See `/docs/REBRANDING_MIGRATION.md` (created in Task #17.16) and `/docs/APPS_SDK_COMPLIANCE_ANALYSIS.md`
 
 Pick tasks from the project board and follow the development process above.
 

@@ -7,76 +7,85 @@
  * @module config/csp
  */
 
+// OpenAI CDN for SDK UI assets (always allowed)
+const OPENAI_CDN = "https://*.oaistatic.com";
+
+// Default production URLs (can be overridden via environment variables)
+const DEFAULT_PRODUCTION_API = "https://word-morph.fly.dev";
+const DEFAULT_PRODUCTION_CDN = "https://word-morph.fly.dev";
+
+// Development tunnel patterns
+const DEV_TUNNELS = [
+  "https://*.ngrok.app",
+  "https://*.ngrok-free.app",
+  "https://*.serveousercontent.com",
+  "https://word-morph.fly.dev", // Include Fly.io deployment in development
+];
+
 /**
  * CSP configuration structure for OpenAI widgets.
  */
 export interface WidgetCSPConfig {
-  /**
-   * Domains that widgets can make HTTP requests to.
-   * Used for API calls, WebSocket connections, etc.
-   */
+  /** Domains that widgets can make HTTP requests to */
   connect_domains: string[];
-
-  /**
-   * Domains that widgets can load resources from.
-   * Used for scripts, stylesheets, images, fonts, etc.
-   */
+  /** Domains that widgets can load resources from */
   resource_domains: string[];
-
-  /**
-   * Domains that can be embedded in iframes (optional).
-   * Only needed if widgets embed external content.
-   */
+  /** Domains that can be embedded in iframes (optional) */
   frame_domains?: string[];
 }
 
 /**
- * Get environment-aware CSP configuration.
- *
- * Development: Allows localhost and ngrok for local testing
- * Production: Restricts to production domains only
- *
- * @returns CSP configuration object
+ * Widget metadata structure.
+ * Uses index signature for MCP SDK compatibility.
  */
-export function getWidgetCSP(): WidgetCSPConfig {
-  const isProduction = process.env.NODE_ENV === "production";
+interface WidgetMetadata {
+  [key: string]: unknown;
+  "openai/widgetPrefersBorder": boolean;
+  "openai/widgetCSP": WidgetCSPConfig;
+  "openai/widgetDomain"?: string;
+}
 
-  if (isProduction) {
-    return {
-      connect_domains: [
-        process.env.PRODUCTION_API_URL || "https://gamebox-api.fly.dev",
-      ],
-      resource_domains: [
-        process.env.PRODUCTION_CDN_URL || "https://cdn.fly.dev",
-        "https://*.oaistatic.com", // OpenAI CDN for SDK UI assets
-      ],
-    };
-  }
-
-  // Development configuration
+/**
+ * Get CSP configuration for production environment.
+ */
+function getProductionCSP(): WidgetCSPConfig {
   return {
-    connect_domains: [
-      "http://localhost:8000", // Local MCP server
-      "https://*.ngrok.app", // ngrok tunnel for ChatGPT testing
-      "https://*.ngrok-free.app", // ngrok free tier
-    ],
-    resource_domains: [
-      "http://localhost:4444", // Local Vite dev server
-      "https://*.ngrok.app", // ngrok tunnel
-      "https://*.ngrok-free.app", // ngrok free tier
-      "https://*.oaistatic.com", // OpenAI CDN
-    ],
+    connect_domains: [process.env.PRODUCTION_API_URL ?? DEFAULT_PRODUCTION_API],
+    resource_domains: [process.env.PRODUCTION_CDN_URL ?? DEFAULT_PRODUCTION_CDN, OPENAI_CDN],
   };
 }
 
 /**
- * Common metadata for all widgets.
- *
- * Includes CSP and border preference.
+ * Get CSP configuration for development environment.
  */
-export function getWidgetMetadata() {
+function getDevelopmentCSP(): WidgetCSPConfig {
   return {
+    connect_domains: ["http://localhost:8000", ...DEV_TUNNELS],
+    resource_domains: ["http://localhost:4444", ...DEV_TUNNELS, OPENAI_CDN],
+  };
+}
+
+/**
+ * Get environment-aware CSP configuration.
+ */
+export function getWidgetCSP(): WidgetCSPConfig {
+  const isProduction = process.env.NODE_ENV === "production";
+  return isProduction ? getProductionCSP() : getDevelopmentCSP();
+}
+
+/**
+ * Get common metadata for all widgets.
+ */
+export function getWidgetMetadata(): WidgetMetadata {
+  const metadata: WidgetMetadata = {
     "openai/widgetPrefersBorder": true,
     "openai/widgetCSP": getWidgetCSP(),
   };
+
+  // Add widgetDomain in production (required for ChatGPT Apps submission)
+  if (process.env.NODE_ENV === "production") {
+    metadata["openai/widgetDomain"] = "word-morph.fly.dev";
+  }
+
+  return metadata;
 }

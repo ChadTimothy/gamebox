@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getDailyWord } from "./data/wordLists.js";
-import { WordChallengeGame } from "./games/wordChallenge.js";
+import { WordMorphGame } from "./games/wordMorph.js";
 
 /**
  * Tests for MCP server game logic.
@@ -36,7 +36,7 @@ describe("MCP Server - Game Logic Integration", () => {
   describe("Game session management", () => {
     it("should create new game with target word", () => {
       const targetWord = "CRANE";
-      const game = new WordChallengeGame(targetWord);
+      const game = new WordMorphGame(targetWord);
 
       const state = game.getState();
       expect(state.word).toBe("CRANE");
@@ -45,7 +45,7 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should maintain game state across guesses", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
 
       game.makeGuess("TRAIN");
       expect(game.getState().guesses).toHaveLength(1);
@@ -55,7 +55,7 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should detect win condition", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
 
       game.makeGuess("CRANE");
 
@@ -64,7 +64,7 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should detect lose condition", () => {
-      const game = new WordChallengeGame("CRANE", 2);
+      const game = new WordMorphGame("CRANE", 2);
 
       game.makeGuess("TRAIN");
       game.makeGuess("BRAIN");
@@ -74,27 +74,27 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should throw error when game is over", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("CRANE");
 
       expect(() => game.makeGuess("TRAIN")).toThrow("Game is already won");
     });
 
     it("should throw error for invalid word", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
 
       expect(() => game.makeGuess("ZZZZZ")).toThrow("Not a valid word");
     });
 
     it("should generate share text on game over", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
 
       game.makeGuess("TRAIN");
       game.makeGuess("CRANE");
 
       const shareText = game.getShareText();
 
-      expect(shareText).toContain("Word Challenge");
+      expect(shareText).toContain("Word Morph");
       expect(shareText).toContain("2/6");
       expect(shareText).toContain("🟩"); // Should have green squares
     });
@@ -103,30 +103,30 @@ describe("MCP Server - Game Logic Integration", () => {
   describe("Session ID generation", () => {
     it("should generate unique session IDs", () => {
       const generateSessionId = () =>
-        `wc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        `wm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
       const id1 = generateSessionId();
       const id2 = generateSessionId();
 
       expect(id1).not.toBe(id2);
-      expect(id1).toMatch(/^wc_\d+_[a-z0-9]+$/);
+      expect(id1).toMatch(/^wm_\d+_[a-z0-9]+$/);
     });
   });
 
   describe("Tool response structure", () => {
-    it("should structure start_word_challenge response correctly", () => {
-      const game = new WordChallengeGame(getDailyWord(new Date()));
+    it("should structure start_word_morph response correctly", () => {
+      const game = new WordMorphGame(getDailyWord(new Date()));
       const state = game.getState();
 
       const response = {
         content: [
           {
             type: "text" as const,
-            text: "🎯 Daily Word Challenge started! Guess the 5-letter word in 6 tries.",
+            text: "🎯 Daily Word Morph started! Guess the 5-letter word in 6 tries.",
           },
         ],
         structuredContent: {
-          gameId: "wc_test_session",
+          gameId: "wm_test_session",
           mode: "daily",
           guesses: state.guesses,
           status: state.status,
@@ -140,8 +140,8 @@ describe("MCP Server - Game Logic Integration", () => {
       expect(response.structuredContent.maxGuesses).toBe(6);
     });
 
-    it("should structure check_word_guess response correctly", () => {
-      const game = new WordChallengeGame("CRANE");
+    it("should structure check_word_morph_guess response correctly", () => {
+      const game = new WordMorphGame("CRANE");
       const result = game.makeGuess("TRAIN");
       const state = game.getState();
 
@@ -153,7 +153,7 @@ describe("MCP Server - Game Logic Integration", () => {
           },
         ],
         structuredContent: {
-          gameId: "wc_test_session",
+          gameId: "wm_test_session",
           guess: "TRAIN",
           result,
           guesses: state.guesses,
@@ -171,7 +171,7 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should include share text on win", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("CRANE");
 
       const state = game.getState();
@@ -191,7 +191,7 @@ describe("MCP Server - Game Logic Integration", () => {
     });
 
     it("should include word on loss", () => {
-      const game = new WordChallengeGame("CRANE", 1);
+      const game = new WordMorphGame("CRANE", 1);
       game.makeGuess("TRAIN");
 
       const state = game.getState();

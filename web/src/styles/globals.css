@@ -1,6 +1,19 @@
 @import "tailwindcss";
+@import "@openai/apps-sdk-ui/css";
 
-/* Custom animations for Word Challenge */
+/* Tell Tailwind to scan Apps SDK UI components */
+@source "../node_modules/@openai/apps-sdk-ui/**/*.{js,ts,jsx,tsx}";
+
+/* Configure dark mode based on system preference */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+/* Custom animations for Word Morph */
+
+/* Tile flip animation (already in use) */
 @keyframes flip {
   0% {
     transform: rotateX(0);
@@ -15,4 +28,94 @@
 
 .animate-flip {
   animation: flip 0.6s ease-in-out;
+}
+
+/* Win celebration animations */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 0.5s ease-in-out;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out;
+}
+
+/* Loss state animation */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Word Morph Color Palette */
+:root {
+  --word-morph-correct: #14B8A6;    /* Teal - letter in correct position */
+  --word-morph-present: #F97316;    /* Coral - letter in word but wrong position */
+  --word-morph-absent: #64748B;     /* Slate - letter not in word */
+  --word-morph-background: #F8FAFC; /* Light background */
+  --word-morph-border: #CBD5E1;     /* Border color */
+}
+
+/* Word Morph tile color classes */
+.word-morph-correct {
+  background-color: var(--word-morph-correct);
+  color: white;
+  border-color: var(--word-morph-correct);
+}
+
+.word-morph-present {
+  background-color: var(--word-morph-present);
+  color: white;
+  border-color: var(--word-morph-present);
+}
+
+.word-morph-absent {
+  background-color: var(--word-morph-absent);
+  color: white;
+  border-color: var(--word-morph-absent);
+}
+
+/* Word Morph keyboard key colors */
+.word-morph-key-correct {
+  background-color: var(--word-morph-correct);
+  color: white;
+}
+
+.word-morph-key-present {
+  background-color: var(--word-morph-present);
+  color: white;
+}
+
+.word-morph-key-absent {
+  background-color: var(--word-morph-absent);
+  color: white;
 }

@@ -1,7 +1,7 @@
 /**
- * Word lists for Word Challenge game.
+ * Word lists for Word Morph game.
  *
- * Contains curated word lists for a Wordle-style word guessing game:
+ * Contains curated word lists for the word transformation puzzle:
  * - WORD_LIST: Common 5-letter words used as daily answers (2,315 words)
  * - VALID_GUESSES: All valid 5-letter English words (12,972 words)
  *

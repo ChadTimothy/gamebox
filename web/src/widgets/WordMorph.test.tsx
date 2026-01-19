@@ -1,27 +1,33 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { WordChallenge } from "./WordChallenge.js";
+import { useState } from "react";
+import { WordMorph } from "./WordMorph.js";
 
-// Mock useWidgetState hook
+// Mock useWidgetState hook - returns useState behavior for testing
 vi.mock("../hooks/useWidgetState.js", () => ({
-  useWidgetState: vi.fn((defaultState) => {
-    const [state, setState] = vi.importActual("react").useState(defaultState);
-    return [state, setState];
-  }),
+  useWidgetState: <T,>(defaultState: T) => useState(defaultState),
 }));
 
-describe("WordChallenge Widget", () => {
+// Mock useOpenAiGlobal hook - returns undefined (no tool output)
+vi.mock("../hooks/useOpenAiGlobal.js", () => ({
+  useOpenAiGlobal: () => undefined,
+}));
+
+// Backspace key display character
+const BACKSPACE_CHAR = "\u232B";
+
+describe("WordMorph Widget", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("should render the game title", () => {
-    render(<WordChallenge />);
-    expect(screen.getByText("Word Challenge")).toBeInTheDocument();
+    render(<WordMorph />);
+    expect(screen.getByText("Word Morph")).toBeInTheDocument();
   });
 
   it("should render 6x5 grid of tiles", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
     // 6 rows × 5 tiles = 30 tiles
     const tiles = screen.getAllByRole("generic").filter(
       (el) => el.className.includes("w-14 h-14")
@@ -30,23 +36,23 @@ describe("WordChallenge Widget", () => {
   });
 
   it("should display current guess count", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
     expect(screen.getByText("Guess 1 of 6")).toBeInTheDocument();
   });
 
   it("should render keyboard with all letters", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     // Check for some keyboard letters
     expect(screen.getByText("Q")).toBeInTheDocument();
     expect(screen.getByText("A")).toBeInTheDocument();
     expect(screen.getByText("Z")).toBeInTheDocument();
     expect(screen.getByText("ENTER")).toBeInTheDocument();
-    expect(screen.getByText("⌫")).toBeInTheDocument();
+    expect(screen.getByText(BACKSPACE_CHAR)).toBeInTheDocument();
   });
 
   it("should add letters to current guess when keyboard is clicked", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     fireEvent.click(screen.getByText("C"));
     fireEvent.click(screen.getByText("R"));
@@ -68,13 +74,13 @@ describe("WordChallenge Widget", () => {
   });
 
   it("should remove letters when backspace is clicked", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     fireEvent.click(screen.getByText("C"));
     fireEvent.click(screen.getByText("R"));
     fireEvent.click(screen.getByText("A"));
 
-    fireEvent.click(screen.getByText("⌫"));
+    fireEvent.click(screen.getByText(BACKSPACE_CHAR));
 
     const tiles = screen.getAllByRole("generic").filter(
       (el) => el.className.includes("w-14 h-14")
@@ -87,7 +93,7 @@ describe("WordChallenge Widget", () => {
   });
 
   it("should not allow more than 5 letters in current guess", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     fireEvent.click(screen.getByText("C"));
     fireEvent.click(screen.getByText("R"));
@@ -110,7 +116,7 @@ describe("WordChallenge Widget", () => {
   });
 
   it("should show message when trying to submit incomplete guess", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     fireEvent.click(screen.getByText("C"));
     fireEvent.click(screen.getByText("R"));
@@ -121,7 +127,7 @@ describe("WordChallenge Widget", () => {
   });
 
   it("should show message when trying to submit with 5 letters (placeholder)", () => {
-    render(<WordChallenge />);
+    render(<WordMorph />);
 
     fireEvent.click(screen.getByText("C"));
     fireEvent.click(screen.getByText("R"));

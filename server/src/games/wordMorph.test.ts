@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   checkGuess,
   generateShareText,
-  WordChallengeGame,
+  WordMorphGame,
   type LetterResult,
   type LetterFeedback,
-} from "./wordChallenge.js";
+} from "./wordMorph.js";
 
 describe("checkGuess", () => {
   describe("exact matches", () => {
@@ -126,7 +126,7 @@ describe("generateShareText", () => {
   it("should generate share text for won game", () => {
     const text = generateShareText(["CRANE", "GRACE"], "GRACE", 6, true);
 
-    expect(text).toContain("Word Challenge 2/6");
+    expect(text).toContain("Word Morph 2/6");
     expect(text).toContain("🟩"); // correct
     expect(text).toContain("🟨"); // present
     expect(text).toContain("⬜"); // absent
@@ -140,7 +140,7 @@ describe("generateShareText", () => {
       false
     );
 
-    expect(text).toContain("Word Challenge X/6");
+    expect(text).toContain("Word Morph X/6");
     expect(text).not.toContain("6/6"); // Should use X for lost games
   });
 
@@ -171,10 +171,10 @@ describe("generateShareText", () => {
   });
 });
 
-describe("WordChallengeGame", () => {
+describe("WordMorphGame", () => {
   describe("constructor", () => {
     it("should create game with valid word", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       const state = game.getState();
 
       expect(state.word).toBe("CRANE");
@@ -184,33 +184,33 @@ describe("WordChallengeGame", () => {
     });
 
     it("should normalize word to uppercase", () => {
-      const game = new WordChallengeGame("crane");
+      const game = new WordMorphGame("crane");
       expect(game.getState().word).toBe("CRANE");
     });
 
     it("should accept custom max guesses", () => {
-      const game = new WordChallengeGame("CRANE", 10);
+      const game = new WordMorphGame("CRANE", 10);
       expect(game.getState().maxGuesses).toBe(10);
     });
 
     it("should throw error for invalid word length", () => {
-      expect(() => new WordChallengeGame("TOO")).toThrow(
+      expect(() => new WordMorphGame("TOO")).toThrow(
         "Word must be exactly 5 letters"
       );
-      expect(() => new WordChallengeGame("TOOLONG")).toThrow(
+      expect(() => new WordMorphGame("TOOLONG")).toThrow(
         "Word must be exactly 5 letters"
       );
-      expect(() => new WordChallengeGame("")).toThrow(
+      expect(() => new WordMorphGame("")).toThrow(
         "Word must be exactly 5 letters"
       );
     });
   });
 
   describe("makeGuess", () => {
-    let game: WordChallengeGame;
+    let game: WordMorphGame;
 
     beforeEach(() => {
-      game = new WordChallengeGame("CRANE");
+      game = new WordMorphGame("CRANE");
     });
 
     it("should accept valid guess", () => {
@@ -253,7 +253,7 @@ describe("WordChallengeGame", () => {
 
   describe("win condition", () => {
     it("should set status to won when correct guess", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("CRANE");
 
       expect(game.getState().status).toBe("won");
@@ -261,7 +261,7 @@ describe("WordChallengeGame", () => {
     });
 
     it("should not allow guesses after winning", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("CRANE");
 
       expect(() => game.makeGuess("TRAIN")).toThrow("Game is already won");
@@ -270,7 +270,7 @@ describe("WordChallengeGame", () => {
 
   describe("lose condition", () => {
     it("should set status to lost after max guesses", () => {
-      const game = new WordChallengeGame("CRANE", 3);
+      const game = new WordMorphGame("CRANE", 3);
 
       game.makeGuess("TRAIN");
       game.makeGuess("BRAIN");
@@ -281,7 +281,7 @@ describe("WordChallengeGame", () => {
     });
 
     it("should not allow guesses after losing", () => {
-      const game = new WordChallengeGame("CRANE", 1);
+      const game = new WordMorphGame("CRANE", 1);
       game.makeGuess("TRAIN");
 
       expect(() => game.makeGuess("BRAIN")).toThrow("Game is already lost");
@@ -290,7 +290,7 @@ describe("WordChallengeGame", () => {
 
   describe("getState", () => {
     it("should return immutable state", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("TRAIN");
 
       const state1 = game.getState();
@@ -302,7 +302,7 @@ describe("WordChallengeGame", () => {
     });
 
     it("should reflect current game state", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
 
       expect(game.getState().guesses).toHaveLength(0);
 
@@ -316,17 +316,17 @@ describe("WordChallengeGame", () => {
 
   describe("getShareText", () => {
     it("should generate share text for current game state", () => {
-      const game = new WordChallengeGame("GRACE");
+      const game = new WordMorphGame("GRACE");
       game.makeGuess("CRANE");
 
       const text = game.getShareText();
 
-      expect(text).toContain("Word Challenge");
+      expect(text).toContain("Word Morph");
       expect(text).toContain("🟩"); // Has some correct letters
     });
 
     it("should show won status", () => {
-      const game = new WordChallengeGame("CRANE");
+      const game = new WordMorphGame("CRANE");
       game.makeGuess("TRAIN");
       game.makeGuess("CRANE");
 
@@ -336,7 +336,7 @@ describe("WordChallengeGame", () => {
     });
 
     it("should show lost status", () => {
-      const game = new WordChallengeGame("CRANE", 2);
+      const game = new WordMorphGame("CRANE", 2);
       game.makeGuess("TRAIN");
       game.makeGuess("BRAIN");
 

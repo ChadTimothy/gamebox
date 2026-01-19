@@ -8,6 +8,8 @@ import { getDailyWord } from "./data/wordLists.js";
 const PORT = Number(process.env.PORT ?? 8000);
 const MCP_PATH = "/mcp";
 const MCP_METHODS = new Set(["POST", "GET", "DELETE"]);
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const DAYS_PER_YEAR = 365;
 
 /**
  * In-memory game state storage.
@@ -20,6 +22,41 @@ const activeGames = new Map<string, WordChallengeGame>();
  */
 function generateSessionId(): string {
   return `wc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Create an error response for MCP tool calls.
+ */
+function createErrorResponse(message: string) {
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `❌ ${message}`,
+      },
+    ],
+    isError: true,
+  };
+}
+
+/**
+ * Build a message based on game status.
+ */
+function buildGameStatusMessage(
+  status: "playing" | "won" | "lost",
+  guessCount: number,
+  maxGuesses: number,
+  word?: string
+): string {
+  if (status === "won") {
+    return `🎉 Congratulations! You guessed the word in ${guessCount} ${
+      guessCount === 1 ? "try" : "tries"
+    }!`;
+  }
+  if (status === "lost") {
+    return `😔 Game over! The word was ${word}. Better luck next time!`;
+  }
+  return `Guess ${guessCount}/${maxGuesses} recorded.`;
 }
 
 // Create GameBox MCP server
@@ -104,8 +141,9 @@ function createGameBoxServer() {
       const mode = (params as { mode?: string }).mode || "daily";
 
       // Get the target word based on mode
-      const targetWord =
-        mode === "daily" ? getDailyWord(new Date()) : getDailyWord(new Date(Date.now() + Math.random() * 365 * 24 * 60 * 60 * 1000));
+      const targetWord = mode === "daily"
+        ? getDailyWord(new Date())
+        : getDailyWord(new Date(Date.now() + Math.random() * DAYS_PER_YEAR * MS_PER_DAY));
 
       // Create new game
       const game = new WordChallengeGame(targetWord);
@@ -171,15 +209,9 @@ function createGameBoxServer() {
       // Validate game exists
       const game = activeGames.get(gameId);
       if (!game) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "❌ Game not found. Please start a new game with start_word_challenge.",
-            },
-          ],
-          isError: true,
-        };
+        return createErrorResponse(
+          "Game not found. Please start a new game with start_word_challenge."
+        );
       }
 
       try {
@@ -188,16 +220,12 @@ function createGameBoxServer() {
         const state = game.getState();
 
         // Build response message
-        let message = "";
-        if (state.status === "won") {
-          message = `🎉 Congratulations! You guessed the word in ${state.guesses.length} ${
-            state.guesses.length === 1 ? "try" : "tries"
-          }!`;
-        } else if (state.status === "lost") {
-          message = `😔 Game over! The word was ${state.word}. Better luck next time!`;
-        } else {
-          message = `Guess ${state.guesses.length}/${state.maxGuesses} recorded.`;
-        }
+        const message = buildGameStatusMessage(
+          state.status,
+          state.guesses.length,
+          state.maxGuesses,
+          state.word
+        );
 
         // Generate share text if game is over
         const shareText = game.isGameOver() ? game.getShareText() : undefined;
@@ -223,16 +251,7 @@ function createGameBoxServer() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "An error occurred";
-
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `❌ ${errorMessage}`,
-            },
-          ],
-          isError: true,
-        };
+        return createErrorResponse(errorMessage);
       }
     }
   );

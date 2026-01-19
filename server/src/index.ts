@@ -2,10 +2,25 @@ import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { getWidgetMetadata } from "./config/csp.js";
+import { WordChallengeGame } from "./games/wordChallenge.js";
+import { getDailyWord } from "./data/wordLists.js";
 
 const PORT = Number(process.env.PORT ?? 8000);
 const MCP_PATH = "/mcp";
 const MCP_METHODS = new Set(["POST", "GET", "DELETE"]);
+
+/**
+ * In-memory game state storage.
+ * Maps session IDs to active WordChallenge game instances.
+ */
+const activeGames = new Map<string, WordChallengeGame>();
+
+/**
+ * Generate a simple session ID.
+ */
+function generateSessionId(): string {
+  return `wc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
 
 // Create GameBox MCP server
 function createGameBoxServer() {
@@ -14,7 +29,32 @@ function createGameBoxServer() {
     version: "0.1.0",
   });
 
-  // Register a simple test widget resource
+  // Register Word Challenge widget resource
+  server.registerResource(
+    "word-challenge-widget",
+    "ui://widget/word-challenge.html",
+    {},
+    async () => ({
+      contents: [
+        {
+          uri: "ui://widget/word-challenge.html",
+          mimeType: "text/html+skybridge",
+          text: `<div id="root"></div>
+<script type="module">
+  import { WordChallenge } from '/widgets/WordChallenge.js';
+  import { createRoot } from 'react-dom/client';
+  import { createElement } from 'react';
+
+  const root = createRoot(document.getElementById('root'));
+  root.render(createElement(WordChallenge));
+</script>`,
+          _meta: getWidgetMetadata(),
+        },
+      ],
+    })
+  );
+
+  // Register game menu resource
   server.registerResource(
     "game-menu",
     "ui://widget/game-menu.html",
@@ -34,11 +74,170 @@ function createGameBoxServer() {
     })
   );
 
-  // TODO: Register Word Challenge tools
-  // - start_word_challenge
-  // - check_word_guess
+  /**
+   * Start a new Word Challenge game.
+   *
+   * Tool: start_word_challenge
+   */
+  server.registerTool(
+    "start_word_challenge",
+    {
+      title: "Start Word Challenge",
+      description: "Start a new Word Challenge game (Wordle-style word guessing game)",
+      inputSchema: {
+        type: "object",
+        properties: {
+          mode: {
+            type: "string",
+            enum: ["daily", "practice"],
+            description: "Game mode: 'daily' for daily puzzle, 'practice' for random word",
+          },
+        },
+      } as any,
+      _meta: {
+        "openai/outputTemplate": "ui://widget/word-challenge.html",
+        "openai/toolInvocation/invoking": "Starting Word Challenge",
+        "openai/toolInvocation/invoked": "Word Challenge ready! Make your first guess.",
+      },
+    },
+    async (params: unknown) => {
+      const mode = (params as { mode?: string }).mode || "daily";
 
-  // Register a simple test tool
+      // Get the target word based on mode
+      const targetWord =
+        mode === "daily" ? getDailyWord(new Date()) : getDailyWord(new Date(Date.now() + Math.random() * 365 * 24 * 60 * 60 * 1000));
+
+      // Create new game
+      const game = new WordChallengeGame(targetWord);
+      const sessionId = generateSessionId();
+      activeGames.set(sessionId, game);
+
+      const state = game.getState();
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text:
+              mode === "daily"
+                ? "🎯 Daily Word Challenge started! Guess the 5-letter word in 6 tries."
+                : "🎮 Practice Word Challenge started! Guess the 5-letter word in 6 tries.",
+          },
+        ],
+        structuredContent: {
+          gameId: sessionId,
+          mode,
+          guesses: state.guesses,
+          status: state.status,
+          maxGuesses: state.maxGuesses,
+          streak: 0, // TODO: Implement streak tracking in Task #9
+        },
+      };
+    }
+  );
+
+  /**
+   * Make a guess in the active Word Challenge game.
+   *
+   * Tool: check_word_guess
+   */
+  server.registerTool(
+    "check_word_guess",
+    {
+      title: "Make Word Guess",
+      description: "Submit a guess for the active Word Challenge game",
+      inputSchema: {
+        type: "object",
+        properties: {
+          gameId: {
+            type: "string",
+            description: "Game session ID from start_word_challenge",
+          },
+          guess: {
+            type: "string",
+            description: "5-letter word guess",
+            pattern: "^[A-Za-z]{5}$",
+          },
+        },
+        required: ["gameId", "guess"],
+      } as any,
+      _meta: {
+        "openai/outputTemplate": "ui://widget/word-challenge.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId, guess } = params as { gameId: string; guess: string };
+
+      // Validate game exists
+      const game = activeGames.get(gameId);
+      if (!game) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "❌ Game not found. Please start a new game with start_word_challenge.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      try {
+        // Make the guess
+        const result = game.makeGuess(guess);
+        const state = game.getState();
+
+        // Build response message
+        let message = "";
+        if (state.status === "won") {
+          message = `🎉 Congratulations! You guessed the word in ${state.guesses.length} ${
+            state.guesses.length === 1 ? "try" : "tries"
+          }!`;
+        } else if (state.status === "lost") {
+          message = `😔 Game over! The word was ${state.word}. Better luck next time!`;
+        } else {
+          message = `Guess ${state.guesses.length}/${state.maxGuesses} recorded.`;
+        }
+
+        // Generate share text if game is over
+        const shareText = game.isGameOver() ? game.getShareText() : undefined;
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: message,
+            },
+          ],
+          structuredContent: {
+            gameId,
+            guess: guess.toUpperCase(),
+            result,
+            guesses: state.guesses,
+            status: state.status,
+            message,
+            shareText,
+            word: state.status === "lost" ? state.word : undefined,
+          },
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "An error occurred";
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ ${errorMessage}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Register game menu tool
   server.registerTool(
     "show_game_menu",
     {
@@ -54,7 +253,7 @@ function createGameBoxServer() {
     async () => ({
       content: [
         {
-          type: "text",
+          type: "text" as const,
           text: "Welcome to GameBox! 🎮",
         },
       ],

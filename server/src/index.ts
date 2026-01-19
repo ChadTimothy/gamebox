@@ -4,6 +4,13 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordChallengeGame } from "./games/wordChallenge.js";
 import { getDailyWord } from "./data/wordLists.js";
+import {
+  loadStreakData,
+  saveStreakData,
+  updateDailyStreak,
+  updatePracticeStreak,
+  calculateWinRate,
+} from "./data/streaks.js";
 
 const PORT = Number(process.env.PORT ?? 8000);
 const MCP_PATH = "/mcp";
@@ -12,10 +19,25 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const DAYS_PER_YEAR = 365;
 
 /**
- * In-memory game state storage.
- * Maps session IDs to active WordChallenge game instances.
+ * Game session metadata.
  */
-const activeGames = new Map<string, WordChallengeGame>();
+interface GameSession {
+  game: WordChallengeGame;
+  mode: "daily" | "practice";
+  userId: string;
+}
+
+/**
+ * In-memory game state storage.
+ * Maps session IDs to active WordChallenge game sessions.
+ */
+const activeGames = new Map<string, GameSession>();
+
+/**
+ * Default user ID for testing/demo purposes.
+ * In production, this would come from authentication.
+ */
+const DEFAULT_USER_ID = "demo-user";
 
 /**
  * Generate a simple session ID.
@@ -139,16 +161,25 @@ function createGameBoxServer() {
     },
     async (params: unknown) => {
       const mode = (params as { mode?: string }).mode || "daily";
+      const userId = DEFAULT_USER_ID; // In production, extract from auth
+
+      // Load user's streak data
+      const streakData = await loadStreakData(userId);
+      const winRate = calculateWinRate(streakData);
 
       // Get the target word based on mode
       const targetWord = mode === "daily"
         ? getDailyWord(new Date())
         : getDailyWord(new Date(Date.now() + Math.random() * DAYS_PER_YEAR * MS_PER_DAY));
 
-      // Create new game
+      // Create new game and session
       const game = new WordChallengeGame(targetWord);
       const sessionId = generateSessionId();
-      activeGames.set(sessionId, game);
+      activeGames.set(sessionId, {
+        game,
+        mode: mode as "daily" | "practice",
+        userId,
+      });
 
       const state = game.getState();
 
@@ -168,7 +199,10 @@ function createGameBoxServer() {
           guesses: state.guesses,
           status: state.status,
           maxGuesses: state.maxGuesses,
-          streak: 0, // TODO: Implement streak tracking in Task #9
+          streak: streakData.currentStreak,
+          maxStreak: streakData.maxStreak,
+          totalGamesPlayed: streakData.totalGamesPlayed,
+          winRate,
         },
       };
     }
@@ -206,13 +240,15 @@ function createGameBoxServer() {
     async (params: unknown) => {
       const { gameId, guess } = params as { gameId: string; guess: string };
 
-      // Validate game exists
-      const game = activeGames.get(gameId);
-      if (!game) {
+      // Validate game session exists
+      const session = activeGames.get(gameId);
+      if (!session) {
         return createErrorResponse(
           "Game not found. Please start a new game with start_word_challenge."
         );
       }
+
+      const { game, mode, userId } = session;
 
       try {
         // Make the guess
@@ -227,8 +263,21 @@ function createGameBoxServer() {
           state.word
         );
 
+        // Update streak data if game is over
+        let streakData = await loadStreakData(userId);
+        if (game.isGameOver()) {
+          const won = state.status === "won";
+          streakData =
+            mode === "daily"
+              ? updateDailyStreak(streakData, won)
+              : updatePracticeStreak(streakData, won);
+
+          await saveStreakData(userId, streakData);
+        }
+
         // Generate share text if game is over
         const shareText = game.isGameOver() ? game.getShareText() : undefined;
+        const winRate = calculateWinRate(streakData);
 
         return {
           content: [
@@ -246,6 +295,10 @@ function createGameBoxServer() {
             message,
             shareText,
             word: state.status === "lost" ? state.word : undefined,
+            streak: streakData.currentStreak,
+            maxStreak: streakData.maxStreak,
+            totalGamesPlayed: streakData.totalGamesPlayed,
+            winRate,
           },
         };
       } catch (error) {

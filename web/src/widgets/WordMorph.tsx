@@ -434,7 +434,7 @@ export function WordMorph(): JSX.Element {
         if (api) {
           setMessage("Checking guess...");
           api
-            .callTool("gamebox.check_word_guess", {
+            .callTool("gamebox.check_word_morph_guess", {
               gameId: state.gameId,
               guess: currentGuess,
             })
@@ -512,7 +512,7 @@ export function WordMorph(): JSX.Element {
     if (api) {
       setMessage("Starting new game...");
       setState(DEFAULT_STATE);
-      api.callTool("gamebox.start_word_challenge", { mode: "daily" }).catch((error: unknown) => {
+      api.callTool("gamebox.start_word_morph", { mode: "daily" }).catch((error: unknown) => {
         console.error("Error starting game:", error);
         setMessage("Error starting game. Try asking ChatGPT!");
       });

@@ -1,14 +1,14 @@
 /**
- * Word Challenge widget component.
+ * Word Morph widget component.
  *
- * Displays the Wordle-style game board with:
+ * Displays the word transformation puzzle game board with:
  * - 6x5 tile grid
  * - Color-coded feedback (correct, present, absent)
  * - Flip animations
  * - Win/lose states
  * - Share functionality
  *
- * @module widgets/WordChallenge
+ * @module widgets/WordMorph
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -62,7 +62,7 @@ interface ToolOutput {
  * Widget state persisted across sessions.
  * Note: currentGuess is NOT persisted to avoid excessive updates.
  */
-interface WordChallengeState {
+interface WordMorphState {
   gameId?: string;
   word?: string;
   guesses: string[];
@@ -77,7 +77,7 @@ interface WordChallengeState {
 /**
  * Default initial state.
  */
-const DEFAULT_STATE: WordChallengeState = {
+const DEFAULT_STATE: WordMorphState = {
   guesses: [],
   results: [],
   status: "playing",
@@ -321,10 +321,10 @@ function getOpenAiApi(): { callTool: (name: string, params: object) => Promise<u
 }
 
 /**
- * Main Word Challenge widget component.
+ * Main Word Morph widget component.
  */
-export function WordChallenge(): JSX.Element {
-  const [state, setState] = useWidgetState<WordChallengeState>(DEFAULT_STATE);
+export function WordMorph(): JSX.Element {
+  const [state, setState] = useWidgetState<WordMorphState>(DEFAULT_STATE);
   const [currentGuess, setCurrentGuess] = useState<string>("");
   const [message, setMessage] = useState<string>("");
   const [guessedLetters, setGuessedLetters] = useState<Map<string, LetterFeedback>>(new Map());
@@ -499,7 +499,7 @@ export function WordChallenge(): JSX.Element {
       .map((_, i) => state.results[i].map((lr) => feedbackToEmoji(lr.feedback)).join(""))
       .join("\n");
 
-    const shareText = `Word Challenge ${state.guesses.length}/${MAX_GUESSES}\n\n${emojiGrid}`;
+    const shareText = `Word Morph ${state.guesses.length}/${MAX_GUESSES}\n\n${emojiGrid}`;
 
     navigator.clipboard.writeText(shareText).then(
       () => setMessage("Copied to clipboard!"),
@@ -525,7 +525,7 @@ export function WordChallenge(): JSX.Element {
 
   return (
     <div className="flex flex-col items-center p-6 bg-white min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 text-black">Word Challenge</h1>
+      <h1 className="text-3xl font-bold mb-6 text-black">Word Morph</h1>
 
       {/* Status display */}
       <StatusDisplay status={state.status} streak={state.streak} word={state.word} guessCount={state.guesses.length} />

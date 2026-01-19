@@ -11,15 +11,15 @@
 const OPENAI_CDN = "https://*.oaistatic.com";
 
 // Default production URLs (can be overridden via environment variables)
-const DEFAULT_PRODUCTION_API = "https://word-challenge.fly.dev";
-const DEFAULT_PRODUCTION_CDN = "https://word-challenge.fly.dev";
+const DEFAULT_PRODUCTION_API = "https://word-morph.fly.dev";
+const DEFAULT_PRODUCTION_CDN = "https://word-morph.fly.dev";
 
 // Development tunnel patterns
 const DEV_TUNNELS = [
   "https://*.ngrok.app",
   "https://*.ngrok-free.app",
   "https://*.serveousercontent.com",
-  "https://word-challenge.fly.dev", // Include Fly.io deployment in development
+  "https://word-morph.fly.dev", // Include Fly.io deployment in development
 ];
 
 /**
@@ -84,7 +84,7 @@ export function getWidgetMetadata(): WidgetMetadata {
 
   // Add widgetDomain in production (required for ChatGPT Apps submission)
   if (process.env.NODE_ENV === "production") {
-    metadata["openai/widgetDomain"] = "word-challenge.fly.dev";
+    metadata["openai/widgetDomain"] = "word-morph.fly.dev";
   }
 
   return metadata;

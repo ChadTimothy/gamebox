@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import { join } from "node:path";
 
 /**
- * User streak data for Word Challenge game.
+ * User streak data for Word Morph game.
  */
 export interface StreakData {
   /** Current consecutive daily wins */

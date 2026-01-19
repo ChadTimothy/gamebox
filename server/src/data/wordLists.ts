@@ -15310,14 +15310,19 @@ export const VALID_GUESSES: readonly string[] = [
 ] as const;
 
 /**
+ * Set of valid guesses for O(1) lookup performance.
+ */
+const VALID_GUESSES_SET = new Set(VALID_GUESSES);
+
+/**
  * Check if a word is valid for guessing.
- * 
+ *
  * @param word - The word to validate (case-insensitive)
  * @returns true if the word is in the valid guesses list
  */
 export function isValidWord(word: string): boolean {
   const normalized = word.toUpperCase();
-  return VALID_GUESSES.includes(normalized);
+  return VALID_GUESSES_SET.has(normalized);
 }
 
 /**

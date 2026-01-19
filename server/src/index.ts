@@ -7,6 +7,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from "zod";
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordMorphGame } from "./games/wordMorph.js";
+import { LexiconSmithGame, type LetterSet } from "./games/lexiconSmith.js";
 import { getDailyWord } from "./data/wordLists.js";
 import {
   loadStreakData,
@@ -55,10 +56,25 @@ interface GameSession {
 }
 
 /**
+ * Lexicon Smith game session metadata.
+ */
+interface LexiconSmithSession {
+  game: LexiconSmithGame;
+  mode: "daily" | "practice";
+  userId: string;
+}
+
+/**
  * In-memory game state storage.
  * Maps session IDs to active Word Morph game sessions.
  */
 const activeGames = new Map<string, GameSession>();
+
+/**
+ * In-memory Lexicon Smith game state storage.
+ * Maps session IDs to active Lexicon Smith game sessions.
+ */
+const activeLexiconGames = new Map<string, LexiconSmithSession>();
 
 /**
  * Default user ID for testing/demo purposes.
@@ -71,6 +87,70 @@ const DEFAULT_USER_ID = "demo-user";
  */
 function generateSessionId(): string {
   return `wc_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Generate a Lexicon Smith session ID.
+ */
+function generateLexiconSessionId(): string {
+  return `ls_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Generate a letter set for Lexicon Smith.
+ * For daily mode, generates a deterministic set based on the date.
+ * For practice mode, generates a random set.
+ *
+ * @param date - The date to generate letters for
+ * @returns A LetterSet with 1 center letter and 6 outer letters
+ */
+function generateLetterSet(date: Date): LetterSet {
+  // Common consonants and vowels that make good letter sets
+  const consonants = "BCDFGHJKLMNPRSTVWXYZ".split("");
+  const vowels = "AEIOU".split("");
+
+  // Use date to seed the selection for consistent daily letters
+  const daysSinceEpoch = Math.floor(date.getTime() / MS_PER_DAY);
+
+  // Select letters deterministically based on date
+  const selectedLetters = new Set<string>();
+  let seed = daysSinceEpoch;
+
+  // Pick 3-4 vowels and 3-4 consonants to make interesting words possible
+  const numVowels = 2 + (seed % 2); // 2 or 3 vowels
+  const numConsonants = 7 - numVowels; // Remaining are consonants
+
+  // Select vowels
+  for (let i = 0; i < numVowels && selectedLetters.size < 7; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const index = seed % vowels.length;
+    selectedLetters.add(vowels[index]);
+  }
+
+  // Select consonants
+  for (let i = 0; i < numConsonants && selectedLetters.size < 7; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const index = seed % consonants.length;
+    const letter = consonants[index];
+    if (!selectedLetters.has(letter)) {
+      selectedLetters.add(letter);
+    } else {
+      i--; // Retry with next seed
+    }
+  }
+
+  // Convert to array and select center letter
+  const lettersArray = Array.from(selectedLetters);
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+  const centerIndex = seed % lettersArray.length;
+
+  const centerLetter = lettersArray[centerIndex];
+  const outerLetters = lettersArray.filter((_, i) => i !== centerIndex);
+
+  return {
+    centerLetter,
+    outerLetters,
+  };
 }
 
 /**
@@ -271,6 +351,49 @@ function createGameBoxServer(): McpServer {
       }
     },
     required: ["gameId"]
+  };
+
+  // Lexicon Smith schemas
+  const startLexiconSmithSchema = z.object({
+    mode: z.enum(["daily", "practice"]).optional().default("daily"),
+  });
+
+  const submitLexiconWordSchema = z.object({
+    gameId: z.string(),
+    word: z
+      .string()
+      .min(4)
+      .regex(/^[A-Za-z]+$/)
+      .transform((s) => s.toUpperCase()),
+  });
+
+  const startLexiconSmithJsonSchema = {
+    type: "object",
+    properties: {
+      mode: {
+        type: "string",
+        enum: ["daily", "practice"],
+        default: "daily",
+        description: "Game mode: 'daily' for the daily challenge letters, 'practice' for random letters"
+      }
+    }
+  };
+
+  const submitLexiconWordJsonSchema = {
+    type: "object",
+    properties: {
+      gameId: {
+        type: "string",
+        description: "The game session ID returned from start_lexicon_smith"
+      },
+      word: {
+        type: "string",
+        minLength: 4,
+        pattern: "^[A-Za-z]+$",
+        description: "A word to submit (minimum 4 letters, case-insensitive)"
+      }
+    },
+    required: ["gameId", "word"]
   };
 
   /**
@@ -484,6 +607,175 @@ Transform the above clues into a challenging, creative riddle that makes the use
           guessesRemaining: state.maxGuesses - state.guesses.length,
         },
       };
+    }
+  );
+
+  /**
+   * Start a new Lexicon Smith game.
+   */
+  server.registerTool(
+    "gamebox.start_lexicon_smith",
+    {
+      title: "Start Lexicon Smith Game",
+      description:
+        "Use this when the user explicitly asks to play Lexicon Smith, use the Lexicon Smith connector, or launch the Lexicon Smith app. This is a word-building puzzle where players create words from 7 letters (1 center, 6 outer). Every word must include the center letter. Find as many words as possible! Do NOT use for general word games - only when user specifically mentions Lexicon Smith.",
+      inputSchema: startLexiconSmithJsonSchema as any,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/lexicon-smith.html",
+        "openai/toolInvocation/invoking": "Starting Lexicon Smith",
+        "openai/toolInvocation/invoked": "Lexicon Smith ready! Start building words.",
+      },
+    },
+    async (params: unknown) => {
+      const { mode } = startLexiconSmithSchema.parse(params);
+      const userId = DEFAULT_USER_ID;
+
+      const streakData = await loadStreakData(userId);
+      const winRate = calculateWinRate(streakData);
+
+      // Generate letter set based on mode
+      const letterSet =
+        mode === "daily"
+          ? generateLetterSet(new Date())
+          : generateLetterSet(new Date(Date.now() + Math.random() * DAYS_PER_YEAR * MS_PER_DAY));
+
+      // Create new game (no word list = use dictionary validation)
+      const game = new LexiconSmithGame(letterSet);
+      const sessionId = generateLexiconSessionId();
+      activeLexiconGames.set(sessionId, { game, mode, userId });
+
+      const state = game.getState();
+      const modeLabel = mode === "daily" ? "Daily" : "Practice";
+
+      // Build welcome message
+      const welcomeMessage = `
+🔤 ${modeLabel} Lexicon Smith Started!
+
+**Game Rules:**
+- Create words using the 7 letters: ${state.letterSet.centerLetter} (center) + ${state.letterSet.outerLetters.join(" ")}
+- Every word MUST include the center letter: **${state.letterSet.centerLetter}**
+- Minimum word length: 4 letters
+- Scoring: 4-letter=1pt, 5-letter=2pts, 6+ letter=3pts, Pangram (uses all 7)=7pts!
+
+**Available Tools:**
+- \`gamebox.submit_lexicon_word\` - Submit a word you've found
+
+**Your Stats:**
+- Current Streak: ${streakData.currentStreak}
+- Max Streak: ${streakData.maxStreak}
+- Total Games: ${streakData.totalGamesPlayed}
+- Win Rate: ${(winRate * 100).toFixed(1)}%
+
+Start building words! How many can you find?
+`.trim();
+
+      return {
+        content: [textContent(welcomeMessage)],
+        structuredContent: {
+          gameId: sessionId,
+          mode,
+          letterSet: state.letterSet,
+          foundWords: state.foundWords,
+          score: state.score,
+          totalPossibleWords: state.totalPossibleWords,
+          status: state.status,
+          streak: streakData.currentStreak,
+          maxStreak: streakData.maxStreak,
+          totalGamesPlayed: streakData.totalGamesPlayed,
+          winRate,
+        },
+      };
+    }
+  );
+
+  /**
+   * Submit a word in the active Lexicon Smith game.
+   */
+  server.registerTool(
+    "gamebox.submit_lexicon_word",
+    {
+      title: "Submit Lexicon Smith Word",
+      description:
+        "Use this to submit a word in an active Lexicon Smith game session. Only use after gamebox.start_lexicon_smith has been called. Validates the word and awards points if valid.",
+      inputSchema: submitLexiconWordJsonSchema as any,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/lexicon-smith.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId, word } = submitLexiconWordSchema.parse(params);
+
+      const session = activeLexiconGames.get(gameId);
+      if (!session) {
+        return createErrorResponse("Game not found. Please start a new game with start_lexicon_smith.");
+      }
+
+      const { game, mode, userId } = session;
+
+      try {
+        const result = game.submitWord(word);
+        const state = game.getState();
+
+        // Build result message
+        let message = "";
+        if (result.validation === "valid") {
+          message = result.isPangram
+            ? `🎉 **PANGRAM!** "${result.word}" uses all 7 letters! +${result.points} points! 🌟`
+            : `✅ **"${result.word}"** is valid! +${result.points} points`;
+        } else {
+          const errorMessages = {
+            "too-short": "❌ Word is too short (minimum 4 letters)",
+            "missing-center": `❌ Word must contain the center letter: **${state.letterSet.centerLetter}**`,
+            duplicate: "⚠️ You've already found that word!",
+            "not-in-dictionary": "❌ Word not in dictionary",
+            "invalid-letters": "❌ Word contains letters not in the set",
+            invalid: "❌ Invalid word",
+          };
+          message = errorMessages[result.validation] || "❌ Invalid word";
+        }
+
+        // Update streak data if game is complete
+        let streakData = await loadStreakData(userId);
+        if (game.isComplete()) {
+          streakData = mode === "daily" ? updateDailyStreak(streakData, true) : updatePracticeStreak(streakData, true);
+          await saveStreakData(userId, streakData);
+          message += `\n\n🏆 **Game Complete!** You found all ${state.foundWords.length} words!`;
+        }
+
+        return {
+          content: [textContent(message)],
+          structuredContent: {
+            gameId,
+            word: result.word,
+            validation: result.validation,
+            points: result.points,
+            isPangram: result.isPangram,
+            foundWords: state.foundWords,
+            score: state.score,
+            totalPossibleWords: state.totalPossibleWords,
+            status: state.status,
+            message,
+            shareText: game.isComplete() ? game.getShareText() : undefined,
+            streak: streakData.currentStreak,
+            maxStreak: streakData.maxStreak,
+            totalGamesPlayed: streakData.totalGamesPlayed,
+            winRate: calculateWinRate(streakData),
+          },
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        return createErrorResponse(errorMessage);
+      }
     }
   );
 

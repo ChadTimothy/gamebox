@@ -14,6 +14,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWidgetState } from "../hooks/useWidgetState.js";
 import { useOpenAiGlobal } from "../hooks/useOpenAiGlobal.js";
+import type {
+  LetterFeedback,
+  LetterResult,
+  GameStatus,
+  ToolOutput,
+} from "../types/game.js";
 
 // Constants
 const MAX_GUESSES = 6;
@@ -23,40 +29,6 @@ const KEYBOARD_ROWS = [
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
   ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACKSPACE"],
 ] as const;
-
-/**
- * Letter feedback type matching server-side LetterFeedback.
- */
-type LetterFeedback = "correct" | "present" | "absent" | "empty";
-
-/**
- * Result for a single letter in a guess.
- */
-interface LetterResult {
-  letter: string;
-  feedback: LetterFeedback;
-}
-
-/**
- * Game status.
- */
-type GameStatus = "playing" | "won" | "lost";
-
-/**
- * Tool output from MCP server.
- */
-interface ToolOutput {
-  gameId?: string;
-  word?: string;
-  guesses?: string[];
-  result?: LetterFeedback[];
-  status?: GameStatus;
-  streak?: number;
-  maxStreak?: number;
-  totalGamesPlayed?: number;
-  winRate?: number;
-  message?: string;
-}
 
 /**
  * Widget state persisted across sessions.

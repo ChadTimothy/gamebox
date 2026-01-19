@@ -10,7 +10,7 @@
 GameBox brings the most viral word games directly into ChatGPT with zero downloads and beautiful interactive widgets. Based on proven game mechanics with 5.3B+ annual plays worldwide, GameBox combines:
 
 - **Low-effort development** - Minimal complex UI, chat-native interaction
-- **High viral potential** - Proven game mechanics (Wordle, Connections, Spelling Bee)
+- **High viral potential** - Proven game mechanics (Wordle, Connections, word-building puzzles)
 - **Perfect ChatGPT fit** - Leverages AI for smart gameplay
 - **Broad appeal** - Something for everyone among 800M+ weekly ChatGPT users
 
@@ -37,12 +37,12 @@ Find 4 groups of 4 related words from a 4x4 grid.
 - **4 Mistakes Allowed**: Think carefully!
 - **Beautiful Animations**: Smooth, satisfying interactions
 
-### 🐝 Spelling Bee
-Make words from 7 letters. Center letter required!
-- **Find the Pangram**: Use all 7 letters for bonus points
-- **Rank Up**: Beginner → Good → Solid → Nice → Great → Amazing → Genius → Queen Bee
-- **Honeycomb UI**: Beautiful hexagonal layout
-- **Endless Fun**: Find every possible word
+### 🔤 Lexicon Smith
+Build words from 7 letters - center letter required!
+- **Find the Pangram**: Use all 7 letters for 7 bonus points
+- **Length-based Scoring**: 4-letter=1pt, 5-letter=2pts, 6+ letters=3pts
+- **Circular Layout**: Beautiful letter arrangement
+- **Daily & Practice Modes**: New challenge daily or play unlimited
 
 ### 🧠 Trivia Challenge
 Test your knowledge across multiple categories.
@@ -112,7 +112,7 @@ We've completed a comprehensive review against the [Official OpenAI Apps SDK doc
 - [ ] **Epic #4**: Game 1 - Word Challenge
 - [ ] **Epic #11**: Game 2 - 20 Questions AI
 - [ ] **Epic #12**: Game 3 - Connections
-- [ ] **Epic #13**: Game 4 - Spelling Bee
+- [x] **Epic #13**: Game 4 - Lexicon Smith ✅
 - [ ] **Epic #14**: Game 5 - Trivia Challenge
 - [ ] **Epic #15**: Integration & Polish
 - [ ] **Epic #16**: Testing & Deployment
@@ -177,7 +177,7 @@ Each task follows this process:
 
 ### Phase 2: Core Games (Week 2)
 - Implement Connections
-- Implement Spelling Bee
+- ✅ Implement Lexicon Smith (COMPLETE)
 - Implement Trivia Challenge
 
 ### Phase 3: Polish (Week 3)

@@ -1,13 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { useState } from "react";
 import { WordChallenge } from "./WordChallenge.js";
 
-// Mock useWidgetState hook
+// Mock useWidgetState hook - returns useState behavior for testing
 vi.mock("../hooks/useWidgetState.js", () => ({
-  useWidgetState: vi.fn((defaultState) => {
-    const [state, setState] = vi.importActual("react").useState(defaultState);
-    return [state, setState];
-  }),
+  useWidgetState: (defaultState: any) => useState(defaultState),
 }));
 
 describe("WordChallenge Widget", () => {

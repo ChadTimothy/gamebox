@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { z } from "zod";
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordChallengeGame } from "./games/wordChallenge.js";
 import { getDailyWord } from "./data/wordLists.js";
@@ -138,21 +139,16 @@ function createGameBoxServer() {
    *
    * Tool: start_word_challenge
    */
+  const startWordChallengeSchema = z.object({
+    mode: z.enum(["daily", "practice"]).optional().default("daily"),
+  });
+
   server.registerTool(
     "start_word_challenge",
     {
       title: "Start Word Challenge",
       description: "Start a new Word Challenge game (Wordle-style word guessing game)",
-      inputSchema: {
-        type: "object",
-        properties: {
-          mode: {
-            type: "string",
-            enum: ["daily", "practice"],
-            description: "Game mode: 'daily' for daily puzzle, 'practice' for random word",
-          },
-        },
-      } as any,
+      inputSchema: startWordChallengeSchema as any,
       _meta: {
         "openai/outputTemplate": "ui://widget/word-challenge.html",
         "openai/toolInvocation/invoking": "Starting Word Challenge",
@@ -160,7 +156,7 @@ function createGameBoxServer() {
       },
     },
     async (params: unknown) => {
-      const mode = (params as { mode?: string }).mode || "daily";
+      const { mode = "daily" } = startWordChallengeSchema.parse(params);
       const userId = DEFAULT_USER_ID; // In production, extract from auth
 
       // Load user's streak data
@@ -213,32 +209,26 @@ function createGameBoxServer() {
    *
    * Tool: check_word_guess
    */
+  const checkWordGuessSchema = z.object({
+    gameId: z.string(),
+    guess: z.string()
+      .length(5)
+      .regex(/^[A-Za-z]{5}$/)
+      .transform(s => s.toUpperCase()),
+  });
+
   server.registerTool(
     "check_word_guess",
     {
       title: "Make Word Guess",
       description: "Submit a guess for the active Word Challenge game",
-      inputSchema: {
-        type: "object",
-        properties: {
-          gameId: {
-            type: "string",
-            description: "Game session ID from start_word_challenge",
-          },
-          guess: {
-            type: "string",
-            description: "5-letter word guess",
-            pattern: "^[A-Za-z]{5}$",
-          },
-        },
-        required: ["gameId", "guess"],
-      } as any,
+      inputSchema: checkWordGuessSchema as any,
       _meta: {
         "openai/outputTemplate": "ui://widget/word-challenge.html",
       },
     },
     async (params: unknown) => {
-      const { gameId, guess } = params as { gameId: string; guess: string };
+      const { gameId, guess } = checkWordGuessSchema.parse(params);
 
       // Validate game session exists
       const session = activeGames.get(gameId);
@@ -315,7 +305,7 @@ function createGameBoxServer() {
     {
       title: "Show Game Menu",
       description: "Display the GameBox game selection menu",
-      inputSchema: {},
+      inputSchema: z.object({}) as any,
       _meta: {
         "openai/outputTemplate": "ui://widget/game-menu.html",
         "openai/toolInvocation/invoking": "Loading GameBox menu",

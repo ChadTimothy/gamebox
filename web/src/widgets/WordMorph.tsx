@@ -85,16 +85,16 @@ const DEFAULT_STATE: WordMorphState = {
 };
 
 /**
- * Get Tailwind classes for tile background based on feedback.
+ * Get CSS classes for tile background based on feedback.
  */
 function getTileClasses(feedback: LetterFeedback): string {
   switch (feedback) {
     case "correct":
-      return "bg-green-600 text-white";
+      return "word-morph-correct";
     case "present":
-      return "bg-yellow-500 text-white";
+      return "word-morph-present";
     case "absent":
-      return "bg-gray-500 text-white";
+      return "word-morph-absent";
     case "empty":
       return "bg-transparent border-2 border-gray-300 text-black";
   }
@@ -234,11 +234,11 @@ function getKeyClasses(key: string, feedback: LetterFeedback | undefined): strin
 
   switch (feedback) {
     case "correct":
-      return "bg-green-600 text-white";
+      return "word-morph-key-correct";
     case "present":
-      return "bg-yellow-500 text-white";
+      return "word-morph-key-present";
     case "absent":
-      return "bg-gray-600 text-white";
+      return "word-morph-key-absent";
     default:
       return "bg-gray-300 hover:bg-gray-400";
   }
@@ -558,7 +558,8 @@ export function WordMorph(): JSX.Element {
         <div className="mt-6 flex gap-4 animate-fade-in-up" style={{ animationDelay: "500ms" }}>
           <button
             onClick={handleShare}
-            className="px-6 py-2 bg-green-600 text-white rounded-md font-bold hover:bg-green-700 transition-colors"
+            className="px-6 py-2 text-white rounded-md font-bold hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "var(--word-morph-correct)" }}
           >
             Share Results
           </button>

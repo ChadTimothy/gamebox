@@ -75,3 +75,47 @@
 .animate-shake {
   animation: shake 0.5s ease-in-out;
 }
+
+/* Word Morph Color Palette */
+:root {
+  --word-morph-correct: #14B8A6;    /* Teal - letter in correct position */
+  --word-morph-present: #F97316;    /* Coral - letter in word but wrong position */
+  --word-morph-absent: #64748B;     /* Slate - letter not in word */
+  --word-morph-background: #F8FAFC; /* Light background */
+  --word-morph-border: #CBD5E1;     /* Border color */
+}
+
+/* Word Morph tile color classes */
+.word-morph-correct {
+  background-color: var(--word-morph-correct);
+  color: white;
+  border-color: var(--word-morph-correct);
+}
+
+.word-morph-present {
+  background-color: var(--word-morph-present);
+  color: white;
+  border-color: var(--word-morph-present);
+}
+
+.word-morph-absent {
+  background-color: var(--word-morph-absent);
+  color: white;
+  border-color: var(--word-morph-absent);
+}
+
+/* Word Morph keyboard key colors */
+.word-morph-key-correct {
+  background-color: var(--word-morph-correct);
+  color: white;
+}
+
+.word-morph-key-present {
+  background-color: var(--word-morph-present);
+  color: white;
+}
+
+.word-morph-key-absent {
+  background-color: var(--word-morph-absent);
+  color: white;
+}

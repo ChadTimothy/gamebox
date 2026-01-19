@@ -34,6 +34,10 @@ function createGameBoxServer() {
     })
   );
 
+  // TODO: Register Word Challenge tools
+  // - start_word_challenge
+  // - check_word_guess
+
   // Register a simple test tool
   server.registerTool(
     "show_game_menu",

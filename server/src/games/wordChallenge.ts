@@ -72,7 +72,6 @@ export interface GameState {
  */
 export function checkGuess(guess: string, target: string): LetterResult[] {
   const result: LetterResult[] = new Array(guess.length);
-  const targetLetters = target.split("");
   const remainingTargetLetters: string[] = [];
 
   // First pass: mark exact matches as 'correct'
@@ -81,7 +80,7 @@ export function checkGuess(guess: string, target: string): LetterResult[] {
       result[i] = { letter: guess[i], feedback: "correct" };
     } else {
       // Not an exact match, add target letter to remaining pool
-      remainingTargetLetters.push(targetLetters[i]);
+      remainingTargetLetters.push(target[i]);
     }
   }
 

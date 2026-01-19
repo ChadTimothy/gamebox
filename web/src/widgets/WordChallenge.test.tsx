@@ -5,8 +5,16 @@ import { WordChallenge } from "./WordChallenge.js";
 
 // Mock useWidgetState hook - returns useState behavior for testing
 vi.mock("../hooks/useWidgetState.js", () => ({
-  useWidgetState: (defaultState: any) => useState(defaultState),
+  useWidgetState: <T,>(defaultState: T) => useState(defaultState),
 }));
+
+// Mock useOpenAiGlobal hook - returns undefined (no tool output)
+vi.mock("../hooks/useOpenAiGlobal.js", () => ({
+  useOpenAiGlobal: () => undefined,
+}));
+
+// Backspace key display character
+const BACKSPACE_CHAR = "\u232B";
 
 describe("WordChallenge Widget", () => {
   beforeEach(() => {
@@ -40,7 +48,7 @@ describe("WordChallenge Widget", () => {
     expect(screen.getByText("A")).toBeInTheDocument();
     expect(screen.getByText("Z")).toBeInTheDocument();
     expect(screen.getByText("ENTER")).toBeInTheDocument();
-    expect(screen.getByText("⌫")).toBeInTheDocument();
+    expect(screen.getByText(BACKSPACE_CHAR)).toBeInTheDocument();
   });
 
   it("should add letters to current guess when keyboard is clicked", () => {
@@ -72,7 +80,7 @@ describe("WordChallenge Widget", () => {
     fireEvent.click(screen.getByText("R"));
     fireEvent.click(screen.getByText("A"));
 
-    fireEvent.click(screen.getByText("⌫"));
+    fireEvent.click(screen.getByText(BACKSPACE_CHAR));
 
     const tiles = screen.getAllByRole("generic").filter(
       (el) => el.className.includes("w-14 h-14")

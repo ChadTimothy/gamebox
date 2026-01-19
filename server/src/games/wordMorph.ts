@@ -1,16 +1,25 @@
 /**
- * Word Challenge game logic.
+ * Word Morph game logic.
  *
- * Implements core game mechanics for a Wordle-style word guessing game:
+ * Implements core game mechanics for a word transformation puzzle:
  * - Guess validation and feedback generation
  * - Game state management
  * - Win/lose detection
  * - Share text generation
  *
- * @module games/wordChallenge
+ * @module games/wordMorph
  */
 
 import { isValidWord } from "../data/wordLists.js";
+
+// Game constants
+const DEFAULT_MAX_GUESSES = 6;
+const WORD_LENGTH = 5;
+
+// Emoji characters for share text
+const EMOJI_CORRECT = "\uD83D\uDFE9"; // Green square
+const EMOJI_PRESENT = "\uD83D\uDFE8"; // Yellow square
+const EMOJI_ABSENT = "\u2B1C"; // White square
 
 /**
  * Feedback type for each letter in a guess.
@@ -107,25 +116,32 @@ export function checkGuess(guess: string, target: string): LetterResult[] {
 }
 
 /**
+ * Convert letter feedback to emoji.
+ */
+function feedbackToEmoji(feedback: LetterFeedback): string {
+  switch (feedback) {
+    case "correct":
+      return EMOJI_CORRECT;
+    case "present":
+      return EMOJI_PRESENT;
+    case "absent":
+      return EMOJI_ABSENT;
+  }
+}
+
+/**
  * Generate shareable emoji grid for game results.
  *
  * Creates a text representation using emoji squares:
- * - 🟩 correct (green)
- * - 🟨 present (yellow)
- * - ⬜ absent (gray)
+ * - Green square: correct position
+ * - Yellow square: present but wrong position
+ * - White square: absent
  *
  * @param guesses - Array of guesses made
  * @param target - The target word
  * @param maxGuesses - Maximum allowed guesses
  * @param won - Whether the game was won
  * @returns Shareable emoji text
- *
- * @example
- * ```ts
- * generateShareText(["CRANE", "TRACE"], "GRACE", 6, true)
- * // Returns:
- * // "Word Challenge 2/6\n\n⬜🟨⬜⬜🟩\n🟨🟩🟩🟩🟩"
- * ```
  */
 export function generateShareText(
   guesses: string[],
@@ -133,20 +149,13 @@ export function generateShareText(
   maxGuesses: number,
   won: boolean
 ): string {
-  const emojiMap: Record<LetterFeedback, string> = {
-    correct: "🟩",
-    present: "🟨",
-    absent: "⬜",
-  };
-
-  const title = won
-    ? `Word Challenge ${guesses.length}/${maxGuesses}`
-    : `Word Challenge X/${maxGuesses}`;
+  const scoreDisplay = won ? guesses.length.toString() : "X";
+  const title = `Word Morph ${scoreDisplay}/${maxGuesses}`;
 
   const grid = guesses
     .map((guess) => {
       const result = checkGuess(guess, target);
-      return result.map((r) => emojiMap[r.feedback]).join("");
+      return result.map((r) => feedbackToEmoji(r.feedback)).join("");
     })
     .join("\n");
 
@@ -154,19 +163,19 @@ export function generateShareText(
 }
 
 /**
- * Word Challenge game instance.
+ * Word Morph game instance.
  *
  * Manages game state and validates guesses.
  */
-export class WordChallengeGame {
-  private word: string;
+export class WordMorphGame {
+  private readonly word: string;
+  private readonly maxGuesses: number;
   private guesses: string[] = [];
   private status: GameStatus = "playing";
-  private readonly maxGuesses: number;
 
-  constructor(word: string, maxGuesses: number = 6) {
-    if (!word || word.length !== 5) {
-      throw new Error("Word must be exactly 5 letters");
+  constructor(word: string, maxGuesses: number = DEFAULT_MAX_GUESSES) {
+    if (!word || word.length !== WORD_LENGTH) {
+      throw new Error(`Word must be exactly ${WORD_LENGTH} letters`);
     }
 
     this.word = word.toUpperCase();
@@ -187,8 +196,8 @@ export class WordChallengeGame {
 
     const normalizedGuess = guess.toUpperCase();
 
-    if (normalizedGuess.length !== 5) {
-      throw new Error("Guess must be exactly 5 letters");
+    if (normalizedGuess.length !== WORD_LENGTH) {
+      throw new Error(`Guess must be exactly ${WORD_LENGTH} letters`);
     }
 
     if (!isValidWord(normalizedGuess)) {
@@ -198,12 +207,10 @@ export class WordChallengeGame {
     const result = checkGuess(normalizedGuess, this.word);
     this.guesses.push(normalizedGuess);
 
-    // Check win condition
+    // Update game status
     if (normalizedGuess === this.word) {
       this.status = "won";
-    }
-    // Check lose condition
-    else if (this.guesses.length >= this.maxGuesses) {
+    } else if (this.guesses.length >= this.maxGuesses) {
       this.status = "lost";
     }
 

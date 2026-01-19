@@ -11,7 +11,7 @@
  * @module widgets/WordChallenge
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWidgetState } from "../hooks/useWidgetState.js";
 import { useOpenAiGlobal } from "../hooks/useOpenAiGlobal.js";
 
@@ -265,6 +265,7 @@ function Keyboard({ onKeyPress, guessedLetters }: KeyboardProps): JSX.Element {
             <button
               key={key}
               onClick={() => {
+                console.log("Button clicked:", key);
                 onKeyPress(key);
               }}
               className={`
@@ -332,20 +333,12 @@ export function WordChallenge(): JSX.Element {
   // Subscribe to tool output from ChatGPT
   const toolOutput = useOpenAiGlobal<ToolOutput>("toolOutput");
 
-  // Track last processed tool output to prevent duplicate processing
-  const lastProcessedRef = useRef<string>("");
-
   // Process tool output when game starts or guess is made
   useEffect(() => {
+    console.log("toolOutput received:", toolOutput);
     if (!toolOutput?.gameId) return;
 
-    // Create a unique key for this tool output to prevent reprocessing
-    const outputKey = `${toolOutput.gameId}-${toolOutput.guesses?.length || 0}-${toolOutput.status}`;
-    if (lastProcessedRef.current === outputKey) {
-      return; // Already processed this exact output
-    }
-    lastProcessedRef.current = outputKey;
-
+    console.log("Processing toolOutput with gameId:", toolOutput.gameId);
     setState((prev) => {
       // Build new results array using previous results and new result
       let newResults = prev.results;
@@ -412,6 +405,8 @@ export function WordChallenge(): JSX.Element {
   // Handle key press (from keyboard or button click)
   const handleKeyPress = useCallback(
     (key: string) => {
+      console.log("handleKeyPress called with key:", key);
+      console.log("Current state:", { status: state.status, gameId: state.gameId, currentGuess });
 
       // Check if game is over
       if (state.status !== "playing") {
@@ -466,7 +461,7 @@ export function WordChallenge(): JSX.Element {
         setMessage("");
       }
     },
-    [state.status, state.gameId, currentGuess]
+    [state.status, state.gameId]
   );
 
   // Listen for physical keyboard input
@@ -541,6 +536,7 @@ export function WordChallenge(): JSX.Element {
       {/* Keyboard */}
       <Keyboard
         onKeyPress={(key) => {
+          console.log("Keyboard wrapper calling handleKeyPress with:", key);
           handleKeyPress(key);
         }}
         guessedLetters={guessedLetters}

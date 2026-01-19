@@ -48,20 +48,23 @@ test.describe('Word Challenge Widget UI', () => {
 
   test('should respond to keyboard clicks', async ({ page }) => {
     // Click letters to spell "CRANE"
-    await page.click('button:has-text("C")');
-    await page.click('button:has-text("R")');
-    await page.click('button:has-text("A")');
-    await page.click('button:has-text("N")');
-    await page.click('button:has-text("E")');
+    // Use getByRole with exact name to avoid matching substrings (e.g., R in ENTER)
+    const allTiles = page.locator('div[class*="w-14 h-14"]');
 
-    // Verify letters appear in the first row tiles
-    const firstRowTiles = page.locator('[class*="w-14 h-14"]').first().locator('..').locator('[class*="w-14 h-14"]');
+    await page.getByRole('button', { name: 'C', exact: true }).click();
+    await expect(allTiles.nth(0)).toHaveText('C');
 
-    await expect(firstRowTiles.nth(0)).toHaveText('C');
-    await expect(firstRowTiles.nth(1)).toHaveText('R');
-    await expect(firstRowTiles.nth(2)).toHaveText('A');
-    await expect(firstRowTiles.nth(3)).toHaveText('N');
-    await expect(firstRowTiles.nth(4)).toHaveText('E');
+    await page.getByRole('button', { name: 'R', exact: true }).click();
+    await expect(allTiles.nth(1)).toHaveText('R');
+
+    await page.getByRole('button', { name: 'A', exact: true }).click();
+    await expect(allTiles.nth(2)).toHaveText('A');
+
+    await page.getByRole('button', { name: 'N', exact: true }).click();
+    await expect(allTiles.nth(3)).toHaveText('N');
+
+    await page.getByRole('button', { name: 'E', exact: true }).click();
+    await expect(allTiles.nth(4)).toHaveText('E');
   });
 
   test('should handle backspace key', async ({ page }) => {
@@ -74,25 +77,34 @@ test.describe('Word Challenge Widget UI', () => {
     await page.click('button:has-text("⌫")');
 
     // Verify last letter removed
-    const firstRowTiles = page.locator('[class*="w-14 h-14"]').first().locator('..').locator('[class*="w-14 h-14"]');
-    await expect(firstRowTiles.nth(0)).toHaveText('C');
-    await expect(firstRowTiles.nth(1)).toHaveText('R');
-    await expect(firstRowTiles.nth(2)).toHaveText('');
+    const allTiles = page.locator('div[class*="w-14 h-14"]');
+    await expect(allTiles.nth(0)).toHaveText('C');
+    await expect(allTiles.nth(1)).toHaveText('R');
+    await expect(allTiles.nth(2)).toHaveText('');
   });
 
   test('should not allow more than 5 letters', async ({ page }) => {
     // Try to type 6 letters
-    await page.click('button:has-text("C")');
-    await page.click('button:has-text("R")');
-    await page.click('button:has-text("A")');
-    await page.click('button:has-text("N")');
-    await page.click('button:has-text("E")');
-    await page.click('button:has-text("S")'); // 6th letter should be ignored
+    const allTiles = page.locator('div[class*="w-14 h-14"]');
 
-    // Verify only 5 letters shown
-    const firstRowTiles = page.locator('[class*="w-14 h-14"]').first().locator('..').locator('[class*="w-14 h-14"]');
-    await expect(firstRowTiles.nth(4)).toHaveText('E');
-    await expect(firstRowTiles.nth(5)).not.toHaveText('S');
+    await page.getByRole('button', { name: 'C', exact: true }).click();
+    await page.getByRole('button', { name: 'R', exact: true }).click();
+    await page.getByRole('button', { name: 'A', exact: true }).click();
+    await page.getByRole('button', { name: 'N', exact: true }).click();
+    await page.getByRole('button', { name: 'E', exact: true }).click();
+
+    // Verify 5 letters entered
+    await expect(allTiles.nth(4)).toHaveText('E');
+
+    // Try to add 6th letter - should be ignored
+    await page.getByRole('button', { name: 'S', exact: true }).click();
+
+    // Verify still only 5 letters (S was ignored)
+    await expect(allTiles.nth(0)).toHaveText('C');
+    await expect(allTiles.nth(1)).toHaveText('R');
+    await expect(allTiles.nth(2)).toHaveText('A');
+    await expect(allTiles.nth(3)).toHaveText('N');
+    await expect(allTiles.nth(4)).toHaveText('E');
   });
 
   test('should show validation message for incomplete guess', async ({ page }) => {
@@ -110,17 +122,18 @@ test.describe('Word Challenge Widget UI', () => {
 
   test('should show placeholder message for complete guess', async ({ page }) => {
     // Type 5 letters
-    await page.click('button:has-text("C")');
-    await page.click('button:has-text("R")');
-    await page.click('button:has-text("A")');
-    await page.click('button:has-text("N")');
-    await page.click('button:has-text("E")');
+    await page.getByRole('button', { name: 'C', exact: true }).click();
+    await page.getByRole('button', { name: 'R', exact: true }).click();
+    await page.getByRole('button', { name: 'A', exact: true }).click();
+    await page.getByRole('button', { name: 'N', exact: true }).click();
+    await page.getByRole('button', { name: 'E', exact: true }).click();
 
     // Try to submit
-    await page.click('button:has-text("ENTER")');
+    await page.getByRole('button', { name: 'ENTER', exact: true }).click();
 
     // Verify placeholder message (since MCP not fully integrated in test harness)
-    await expect(page.locator('text=Connect to game server to make guesses')).toBeVisible();
+    // Use partial text match in case of whitespace differences
+    await expect(page.getByText(/Connect to game server/)).toBeVisible();
   });
 
   test('should have correct tile styling', async ({ page }) => {

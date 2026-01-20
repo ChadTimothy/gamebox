@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordMorphGame } from "./games/wordMorph.js";
@@ -574,7 +574,7 @@ function createGameBoxServer(): McpServer {
       title: "Start Word Morph Game",
       description:
         "Use this when the user explicitly asks to play Word Morph, use the Word Morph connector, or launch the Word Morph app. This is a unique word transformation puzzle where users guess 5-letter words and receive feedback (teal = correct position, coral = wrong position, slate = not in word). Do NOT use for general word games, Wordle, or other word-related tasks - only when the user specifically mentions Word Morph or asks to use this connector.",
-      inputSchema: startWordMorphJsonSchema as any,
+      inputSchema: startWordMorphSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -658,7 +658,7 @@ Make your first guess, or ask for a hint!
       title: "Submit Word Morph Guess",
       description:
         "Use this to submit a 5-letter word guess in an active Word Morph game session. Only use after gamebox.start_word_morph has been called. Updates the game state with feedback on correct, present, or absent letters.",
-      inputSchema: checkWordMorphGuessJsonSchema as any,
+      inputSchema: checkWordMorphGuessSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -724,7 +724,7 @@ Make your first guess, or ask for a hint!
       title: "Get Word Morph Hint",
       description:
         "Use this when the user asks for a hint, clue, or help in an active Word Morph game. Returns cryptic clues about the target word's letters and structure. IMPORTANT: Transform these clues into a challenging, creative riddle for the user - don't just repeat the raw clues!",
-      inputSchema: getWordMorphHintJsonSchema as any,
+      inputSchema: getWordMorphHintSchema,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -788,7 +788,7 @@ Transform the above clues into a challenging, creative riddle that makes the use
       title: "Start Lexicon Smith Game",
       description:
         "Use this when the user explicitly asks to play Lexicon Smith, use the Lexicon Smith connector, or launch the Lexicon Smith app. This is a word-building puzzle where players create words from 7 letters (1 center, 6 outer). Every word must include the center letter. Find as many words as possible! Do NOT use for general word games - only when user specifically mentions Lexicon Smith.",
-      inputSchema: startLexiconSmithJsonSchema as any,
+      inputSchema: startLexiconSmithSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -871,7 +871,7 @@ Start building words! How many can you find?
       title: "Submit Lexicon Smith Word",
       description:
         "Use this to submit a word in an active Lexicon Smith game session. Only use after gamebox.start_lexicon_smith has been called. Validates the word and awards points if valid.",
-      inputSchema: submitLexiconWordJsonSchema as any,
+      inputSchema: submitLexiconWordSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -957,7 +957,7 @@ Start building words! How many can you find?
       title: "Start Twenty Questions Game",
       description:
         "Use this when the user explicitly asks to play 20 Questions, Twenty Questions, or a guessing game. This is a classic yes/no question game with two modes: 'ai-guesses' (you think of something, AI asks questions) or 'user-guesses' (AI thinks of something, you ask questions). Do NOT use for other games - only when user specifically mentions 20 Questions or wants to play a guessing game.",
-      inputSchema: start20QuestionsJsonSchema as any,
+      inputSchema: start20QuestionsSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -1043,10 +1043,11 @@ Go ahead, ask your first question!
           mode,
           category: category || "any",
           target: state.target, // Hidden in ai-guesses, visible in user-guesses
-          questionCount: 0,
+          questionAnswers: [],
+          currentQuestionNumber: 1,
+          questionsRemaining: state.maxQuestions,
           maxQuestions: state.maxQuestions,
           status: "playing",
-          questionAnswers: [],
           streak: streakData.currentStreak,
           totalGamesPlayed: streakData.totalGamesPlayed,
           winRate: calculateWinRate(streakData),
@@ -1064,7 +1065,7 @@ Go ahead, ask your first question!
       title: "Answer Twenty Questions",
       description:
         "Use this when the user provides a yes/no answer to your question in an active Twenty Questions game (ai-guesses mode). Include both the question you asked and the user's answer. Only use after gamebox.start_20_questions has been called in ai-guesses mode.",
-      inputSchema: answer20QuestionsJsonSchema as any,
+      inputSchema: answer20QuestionsSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -1112,7 +1113,7 @@ Go ahead, ask your first question!
           structuredContent: {
             gameId,
             answer,
-            questionCount: state.currentQuestionNumber - 1,
+            currentQuestionNumber: state.currentQuestionNumber,
             questionsRemaining,
             maxQuestions: state.maxQuestions,
             status: state.status,
@@ -1135,7 +1136,7 @@ Go ahead, ask your first question!
       title: "Guess Twenty Questions",
       description:
         "Use this when making a final guess in an active Twenty Questions game. Works in both ai-guesses and user-guesses modes. For ai-guesses mode, this is how the AI makes its final guess. For user-guesses mode, this is how the user makes their guess.",
-      inputSchema: guess20QuestionsJsonSchema as any,
+      inputSchema: guess20QuestionsSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -1395,13 +1396,17 @@ function handleTermsOfService(res: ServerResponse): void {
 /**
  * Handle MCP protocol requests.
  */
-async function handleMcpRequest(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
   const server = createGameBoxServer();
-  const transport = new SSEServerTransport("/mcp/sse", res);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless mode
+    enableJsonResponse: true,
+  });
 
+  // Clean up on connection close
   res.on("close", () => {
     transport.close();
     server.close();
@@ -1409,6 +1414,7 @@ async function handleMcpRequest(_req: IncomingMessage, res: ServerResponse): Pro
 
   try {
     await server.connect(transport);
+    await transport.handleRequest(req, res);
   } catch (error) {
     console.error("Error handling MCP request:", error);
     if (!res.headersSent) {

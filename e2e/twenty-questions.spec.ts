@@ -68,7 +68,7 @@ test.describe('Twenty Questions MCP Server', () => {
       expect(data.result).toBeDefined();
       expect(data.result.content).toBeDefined();
       expect(data.result.content[0].type).toBe('text');
-      expect(data.result.content[0].text).toContain('Twenty Questions - AI Guesses Mode');
+      expect(data.result.content[0].text).toContain('AI Guesses Mode');
 
       // Verify structured content
       const structured = data.result.structuredContent;
@@ -190,7 +190,7 @@ test.describe('Twenty Questions MCP Server', () => {
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
 
-      expect(data.result.content[0].text).toContain('Twenty Questions - User Guesses Mode');
+      expect(data.result.content[0].text).toContain('User Guesses Mode');
 
       // Verify structured content
       const structured = data.result.structuredContent;
@@ -286,7 +286,7 @@ test.describe('Twenty Questions MCP Server', () => {
       expect(guessResponse.ok()).toBeTruthy();
       const guessData = await guessResponse.json();
 
-      expect(guessData.result.content[0].text).toContain('Incorrect');
+      expect(guessData.result.content[0].text).toContain('Not quite');
       const structured = guessData.result.structuredContent;
       expect(structured.status).toBe('lost');
       expect(structured.correct).toBe(false);

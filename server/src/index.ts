@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { getWidgetMetadata } from "./config/csp.js";
 import { WordMorphGame } from "./games/wordMorph.js";
 import { LexiconSmithGame, type LetterSet } from "./games/lexiconSmith.js";
+import { TwentyQuestionsGame, type GameMode, type Category } from "./games/twentyQuestions.js";
 import { getDailyWord } from "./data/wordLists.js";
 import {
   loadStreakData,
@@ -65,6 +66,16 @@ interface LexiconSmithSession {
 }
 
 /**
+ * Twenty Questions game session metadata.
+ */
+interface TwentyQuestionsSession {
+  game: TwentyQuestionsGame;
+  mode: GameMode;
+  category?: Category;
+  userId: string;
+}
+
+/**
  * In-memory game state storage.
  * Maps session IDs to active Word Morph game sessions.
  */
@@ -75,6 +86,12 @@ const activeGames = new Map<string, GameSession>();
  * Maps session IDs to active Lexicon Smith game sessions.
  */
 const activeLexiconGames = new Map<string, LexiconSmithSession>();
+
+/**
+ * In-memory Twenty Questions game state storage.
+ * Maps session IDs to active Twenty Questions game sessions.
+ */
+const activeTwentyQuestionsGames = new Map<string, TwentyQuestionsSession>();
 
 /**
  * Default user ID for testing/demo purposes.
@@ -94,6 +111,86 @@ function generateSessionId(): string {
  */
 function generateLexiconSessionId(): string {
   return `ls_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Generate a Twenty Questions session ID.
+ */
+function generateTwentyQuestionsSessionId(): string {
+  return `tq_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Predefined targets for Twenty Questions (user-guesses mode).
+ * Organized by category for interesting gameplay.
+ */
+const TWENTY_QUESTIONS_TARGETS = {
+  people: [
+    "Albert Einstein",
+    "Marie Curie",
+    "Leonardo da Vinci",
+    "Cleopatra",
+    "Abraham Lincoln",
+    "Martin Luther King Jr.",
+    "Shakespeare",
+    "Beethoven",
+    "Mozart",
+    "Queen Elizabeth II",
+  ],
+  places: [
+    "Eiffel Tower",
+    "Great Wall of China",
+    "Taj Mahal",
+    "Statue of Liberty",
+    "Colosseum",
+    "Mount Everest",
+    "Grand Canyon",
+    "Niagara Falls",
+    "Sydney Opera House",
+    "Pyramids of Giza",
+  ],
+  things: [
+    "Bicycle",
+    "Piano",
+    "Telescope",
+    "Compass",
+    "Camera",
+    "Book",
+    "Clock",
+    "Airplane",
+    "Computer",
+    "Umbrella",
+  ],
+  characters: [
+    "Sherlock Holmes",
+    "Harry Potter",
+    "Superman",
+    "Mickey Mouse",
+    "Darth Vader",
+    "Batman",
+    "Spider-Man",
+    "Luke Skywalker",
+    "Hermione Granger",
+    "Indiana Jones",
+  ],
+};
+
+/**
+ * Get a random target from a specific category for user-guesses mode.
+ *
+ * @param category - The category to select from
+ * @returns A random target from the category
+ */
+function getRandomTarget(category: Category): string {
+  if (category === "any") {
+    // Select a random category first
+    const categories: Category[] = ["people", "places", "things", "characters"];
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    return getRandomTarget(randomCategory);
+  }
+
+  const targets = TWENTY_QUESTIONS_TARGETS[category];
+  return targets[Math.floor(Math.random() * targets.length)];
 }
 
 /**
@@ -396,6 +493,78 @@ function createGameBoxServer(): McpServer {
     required: ["gameId", "word"]
   };
 
+  // Twenty Questions schemas
+  const start20QuestionsSchema = z.object({
+    mode: z.enum(["ai-guesses", "user-guesses"]),
+    category: z.enum(["people", "places", "things", "characters", "any"]).optional().default("any"),
+  });
+
+  const answer20QuestionsSchema = z.object({
+    gameId: z.string(),
+    question: z.string().min(3),
+    answer: z.enum(["yes", "no", "maybe", "unknown"]),
+  });
+
+  const guess20QuestionsSchema = z.object({
+    gameId: z.string(),
+    guess: z.string().min(1),
+  });
+
+  const start20QuestionsJsonSchema = {
+    type: "object",
+    properties: {
+      mode: {
+        type: "string",
+        enum: ["ai-guesses", "user-guesses"],
+        description: "'ai-guesses' = AI asks questions to guess what you're thinking, 'user-guesses' = you ask questions to guess what the AI is thinking"
+      },
+      category: {
+        type: "string",
+        enum: ["people", "places", "things", "characters", "any"],
+        default: "any",
+        description: "Optional category for the target (used in user-guesses mode)"
+      }
+    },
+    required: ["mode"]
+  };
+
+  const answer20QuestionsJsonSchema = {
+    type: "object",
+    properties: {
+      gameId: {
+        type: "string",
+        description: "The game session ID returned from start_20_questions"
+      },
+      question: {
+        type: "string",
+        minLength: 3,
+        description: "The question you (AI) just asked the user"
+      },
+      answer: {
+        type: "string",
+        enum: ["yes", "no", "maybe", "unknown"],
+        description: "The user's answer to your question"
+      }
+    },
+    required: ["gameId", "question", "answer"]
+  };
+
+  const guess20QuestionsJsonSchema = {
+    type: "object",
+    properties: {
+      gameId: {
+        type: "string",
+        description: "The game session ID returned from start_20_questions"
+      },
+      guess: {
+        type: "string",
+        minLength: 1,
+        description: "Your final guess at what the target is"
+      }
+    },
+    required: ["gameId", "guess"]
+  };
+
   /**
    * Start a new Word Morph game.
    */
@@ -405,7 +574,7 @@ function createGameBoxServer(): McpServer {
       title: "Start Word Morph Game",
       description:
         "Use this when the user explicitly asks to play Word Morph, use the Word Morph connector, or launch the Word Morph app. This is a unique word transformation puzzle where users guess 5-letter words and receive feedback (teal = correct position, coral = wrong position, slate = not in word). Do NOT use for general word games, Wordle, or other word-related tasks - only when the user specifically mentions Word Morph or asks to use this connector.",
-      inputSchema: startWordMorphJsonSchema as any,
+      inputSchema: startWordMorphSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -489,7 +658,7 @@ Make your first guess, or ask for a hint!
       title: "Submit Word Morph Guess",
       description:
         "Use this to submit a 5-letter word guess in an active Word Morph game session. Only use after gamebox.start_word_morph has been called. Updates the game state with feedback on correct, present, or absent letters.",
-      inputSchema: checkWordMorphGuessJsonSchema as any,
+      inputSchema: checkWordMorphGuessSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -555,7 +724,7 @@ Make your first guess, or ask for a hint!
       title: "Get Word Morph Hint",
       description:
         "Use this when the user asks for a hint, clue, or help in an active Word Morph game. Returns cryptic clues about the target word's letters and structure. IMPORTANT: Transform these clues into a challenging, creative riddle for the user - don't just repeat the raw clues!",
-      inputSchema: getWordMorphHintJsonSchema as any,
+      inputSchema: getWordMorphHintSchema,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -619,7 +788,7 @@ Transform the above clues into a challenging, creative riddle that makes the use
       title: "Start Lexicon Smith Game",
       description:
         "Use this when the user explicitly asks to play Lexicon Smith, use the Lexicon Smith connector, or launch the Lexicon Smith app. This is a word-building puzzle where players create words from 7 letters (1 center, 6 outer). Every word must include the center letter. Find as many words as possible! Do NOT use for general word games - only when user specifically mentions Lexicon Smith.",
-      inputSchema: startLexiconSmithJsonSchema as any,
+      inputSchema: startLexiconSmithSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -702,7 +871,7 @@ Start building words! How many can you find?
       title: "Submit Lexicon Smith Word",
       description:
         "Use this to submit a word in an active Lexicon Smith game session. Only use after gamebox.start_lexicon_smith has been called. Validates the word and awards points if valid.",
-      inputSchema: submitLexiconWordJsonSchema as any,
+      inputSchema: submitLexiconWordSchema,
       annotations: {
         readOnlyHint: false,
         openWorldHint: false,
@@ -768,6 +937,264 @@ Start building words! How many can you find?
             shareText: game.isComplete() ? game.getShareText() : undefined,
             streak: streakData.currentStreak,
             maxStreak: streakData.maxStreak,
+            totalGamesPlayed: streakData.totalGamesPlayed,
+            winRate: calculateWinRate(streakData),
+          },
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        return createErrorResponse(errorMessage);
+      }
+    }
+  );
+
+  /**
+   * Start a new Twenty Questions game.
+   */
+  server.registerTool(
+    "gamebox.start_20_questions",
+    {
+      title: "Start Twenty Questions Game",
+      description:
+        "Use this when the user explicitly asks to play 20 Questions, Twenty Questions, or a guessing game. This is a classic yes/no question game with two modes: 'ai-guesses' (you think of something, AI asks questions) or 'user-guesses' (AI thinks of something, you ask questions). Do NOT use for other games - only when user specifically mentions 20 Questions or wants to play a guessing game.",
+      inputSchema: start20QuestionsSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/twenty-questions.html",
+        "openai/toolInvocation/invoking": "Starting Twenty Questions",
+        "openai/toolInvocation/invoked": "Twenty Questions ready! Let's play.",
+      },
+    },
+    async (params: unknown) => {
+      const { mode, category } = start20QuestionsSchema.parse(params);
+      const userId = DEFAULT_USER_ID;
+
+      const streakData = await loadStreakData(userId);
+
+      // Determine target based on mode
+      let target: string;
+      if (mode === "user-guesses") {
+        // AI thinks of something - pick from predefined list
+        target = getRandomTarget(category || "any");
+      } else {
+        // AI guesses - user thinks of something (hidden target)
+        target = "USER_THINKING"; // Placeholder
+      }
+
+      // Create new game
+      const game = new TwentyQuestionsGame(mode, target, category);
+      const sessionId = generateTwentyQuestionsSessionId();
+      activeTwentyQuestionsGames.set(sessionId, { game, mode, category, userId });
+
+      const state = game.getState();
+      const modeLabel = mode === "ai-guesses" ? "AI Guesses" : "User Guesses";
+
+      // Build welcome message
+      const welcomeMessage =
+        mode === "ai-guesses"
+          ? `
+🎯 ${modeLabel} Mode - Twenty Questions Started!
+
+**How to Play:**
+- Think of something (person, place, thing, or character)
+- I'll ask up to 20 yes/no questions to guess it
+- Answer with yes, no, maybe, or unknown
+- I'll make a guess when I'm confident!
+
+**Your Stats:**
+- Current Streak: ${streakData.currentStreak}
+- Total Games: ${streakData.totalGamesPlayed}
+- Win Rate: ${(calculateWinRate(streakData) * 100).toFixed(1)}%
+
+Ready? Think of something interesting! I'll start asking questions.
+
+Is it a real person (past or present)?
+`.trim()
+          : `
+🎯 ${modeLabel} Mode - Twenty Questions Started!
+
+**How to Play:**
+- I'm thinking of: **${category === "any" ? "something" : `a ${category?.slice(0, -1)}`}**
+- Ask me up to 20 yes/no questions
+- I'll answer yes, no, or maybe
+- Make a guess when you think you know!
+
+**Your Stats:**
+- Current Streak: ${streakData.currentStreak}
+- Total Games: ${streakData.totalGamesPlayed}
+- Win Rate: ${(calculateWinRate(streakData) * 100).toFixed(1)}%
+
+**Available Tools:**
+- \`gamebox.guess_20_questions\` - Make your final guess
+
+Questions remaining: ${state.maxQuestions}
+
+Go ahead, ask your first question!
+`.trim();
+
+      return {
+        content: [textContent(welcomeMessage)],
+        structuredContent: {
+          gameId: sessionId,
+          mode,
+          category: category || "any",
+          target: state.target, // Hidden in ai-guesses, visible in user-guesses
+          questionAnswers: [],
+          currentQuestionNumber: 1,
+          questionsRemaining: state.maxQuestions,
+          maxQuestions: state.maxQuestions,
+          status: "playing",
+          streak: streakData.currentStreak,
+          totalGamesPlayed: streakData.totalGamesPlayed,
+          winRate: calculateWinRate(streakData),
+        },
+      };
+    }
+  );
+
+  /**
+   * Submit an answer to the AI's question in Twenty Questions.
+   */
+  server.registerTool(
+    "gamebox.answer_20_questions",
+    {
+      title: "Answer Twenty Questions",
+      description:
+        "Use this when the user provides a yes/no answer to your question in an active Twenty Questions game (ai-guesses mode). Include both the question you asked and the user's answer. Only use after gamebox.start_20_questions has been called in ai-guesses mode.",
+      inputSchema: answer20QuestionsSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/twenty-questions.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId, question, answer } = answer20QuestionsSchema.parse(params);
+
+      const session = activeTwentyQuestionsGames.get(gameId);
+      if (!session) {
+        return createErrorResponse("Game session not found. Please start a new game with start_20_questions.");
+      }
+
+      const { game, mode } = session;
+
+      if (mode !== "ai-guesses") {
+        return createErrorResponse("This tool is only for ai-guesses mode. Use guess_20_questions to make a guess.");
+      }
+
+      try {
+        // Record the AI's question first
+        game.askQuestion(question, "ai");
+
+        // Then record the user's answer
+        game.submitAnswer(answer);
+
+        const state = game.getState();
+        const questionsRemaining = game.getQuestionsRemaining();
+
+        // Build response with next question or game over
+        let message = `✅ Answer recorded: **${answer}**\n\nQuestions used: ${state.currentQuestionNumber - 1} of ${state.maxQuestions}`;
+
+        if (state.status === "lost") {
+          message += "\n\n❌ I've used all 20 questions and haven't guessed it yet. You win! What were you thinking of?";
+        } else if (questionsRemaining > 0) {
+          message += "\n\nLet me think of my next question...";
+        }
+
+        return {
+          content: [textContent(message)],
+          structuredContent: {
+            gameId,
+            answer,
+            currentQuestionNumber: state.currentQuestionNumber,
+            questionsRemaining,
+            maxQuestions: state.maxQuestions,
+            status: state.status,
+            questionAnswers: state.questionAnswers,
+          },
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        return createErrorResponse(errorMessage);
+      }
+    }
+  );
+
+  /**
+   * Make a final guess in Twenty Questions.
+   */
+  server.registerTool(
+    "gamebox.guess_20_questions",
+    {
+      title: "Guess Twenty Questions",
+      description:
+        "Use this when making a final guess in an active Twenty Questions game. Works in both ai-guesses and user-guesses modes. For ai-guesses mode, this is how the AI makes its final guess. For user-guesses mode, this is how the user makes their guess.",
+      inputSchema: guess20QuestionsSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/twenty-questions.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId, guess } = guess20QuestionsSchema.parse(params);
+
+      const session = activeTwentyQuestionsGames.get(gameId);
+      if (!session) {
+        return createErrorResponse("Game not found. Please start a new game with start_20_questions.");
+      }
+
+      const { game, userId } = session;
+
+      try {
+        const result = game.makeGuess(guess);
+        const state = game.getState();
+
+        // Update streak data
+        let streakData = await loadStreakData(userId);
+        if (result.correct) {
+          streakData = updatePracticeStreak(streakData, true);
+        } else {
+          streakData = updatePracticeStreak(streakData, false);
+        }
+        await saveStreakData(userId, streakData);
+
+        // Build result message
+        let message = "";
+        if (result.correct) {
+          message = result.wasAI
+            ? `🎉 **Correct!** I guessed it: **${result.target}**!\n\nI figured it out in ${state.currentQuestionNumber - 1} questions. Great game!`
+            : `🎉 **Correct!** You guessed it: **${result.target}**!\n\nYou figured it out in ${state.questionAnswers.length} questions. Well done!`;
+        } else {
+          message = result.wasAI
+            ? `❌ Hmm, my guess of **"${guess}"** was wrong. The answer was **${result.target}**. You win!`
+            : `❌ Not quite! You guessed **"${guess}"** but it was **${result.target}**. Better luck next time!`;
+        }
+
+        message += `\n\n**Updated Stats:**\n- Current Streak: ${streakData.currentStreak}\n- Total Games: ${streakData.totalGamesPlayed}\n- Win Rate: ${(calculateWinRate(streakData) * 100).toFixed(1)}%`;
+
+        return {
+          content: [textContent(message)],
+          structuredContent: {
+            gameId,
+            guess,
+            correct: result.correct,
+            target: result.target,
+            status: result.status,
+            questionCount: state.questionAnswers.length,
+            questionAnswers: state.questionAnswers,
+            shareText: game.getShareText(),
+            streak: streakData.currentStreak,
             totalGamesPlayed: streakData.totalGamesPlayed,
             winRate: calculateWinRate(streakData),
           },
@@ -969,13 +1396,17 @@ function handleTermsOfService(res: ServerResponse): void {
 /**
  * Handle MCP protocol requests.
  */
-async function handleMcpRequest(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
 
   const server = createGameBoxServer();
-  const transport = new SSEServerTransport("/mcp/sse", res);
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless mode
+    enableJsonResponse: true,
+  });
 
+  // Clean up on connection close
   res.on("close", () => {
     transport.close();
     server.close();
@@ -983,6 +1414,7 @@ async function handleMcpRequest(_req: IncomingMessage, res: ServerResponse): Pro
 
   try {
     await server.connect(transport);
+    await transport.handleRequest(req, res);
   } catch (error) {
     console.error("Error handling MCP request:", error);
     if (!res.headersSent) {

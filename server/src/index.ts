@@ -501,6 +501,7 @@ function createGameBoxServer(): McpServer {
 
   const answer20QuestionsSchema = z.object({
     gameId: z.string(),
+    question: z.string().min(3),
     answer: z.enum(["yes", "no", "maybe", "unknown"]),
   });
 
@@ -534,13 +535,18 @@ function createGameBoxServer(): McpServer {
         type: "string",
         description: "The game session ID returned from start_20_questions"
       },
+      question: {
+        type: "string",
+        minLength: 3,
+        description: "The question you (AI) just asked the user"
+      },
       answer: {
         type: "string",
         enum: ["yes", "no", "maybe", "unknown"],
-        description: "Your answer to the AI's question"
+        description: "The user's answer to your question"
       }
     },
-    required: ["gameId", "answer"]
+    required: ["gameId", "question", "answer"]
   };
 
   const guess20QuestionsJsonSchema = {
@@ -1057,7 +1063,7 @@ Go ahead, ask your first question!
     {
       title: "Answer Twenty Questions",
       description:
-        "Use this when the user provides a yes/no answer to the AI's question in an active Twenty Questions game (ai-guesses mode). Only use after gamebox.start_20_questions has been called in ai-guesses mode.",
+        "Use this when the user provides a yes/no answer to your question in an active Twenty Questions game (ai-guesses mode). Include both the question you asked and the user's answer. Only use after gamebox.start_20_questions has been called in ai-guesses mode.",
       inputSchema: answer20QuestionsJsonSchema as any,
       annotations: {
         readOnlyHint: false,
@@ -1069,11 +1075,11 @@ Go ahead, ask your first question!
       },
     },
     async (params: unknown) => {
-      const { gameId, answer } = answer20QuestionsSchema.parse(params);
+      const { gameId, question, answer } = answer20QuestionsSchema.parse(params);
 
       const session = activeTwentyQuestionsGames.get(gameId);
       if (!session) {
-        return createErrorResponse("Game not found. Please start a new game with start_20_questions.");
+        return createErrorResponse("Game session not found. Please start a new game with start_20_questions.");
       }
 
       const { game, mode } = session;
@@ -1083,7 +1089,10 @@ Go ahead, ask your first question!
       }
 
       try {
-        // Record the answer to the last question
+        // Record the AI's question first
+        game.askQuestion(question, "ai");
+
+        // Then record the user's answer
         game.submitAnswer(answer);
 
         const state = game.getState();

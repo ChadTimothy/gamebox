@@ -9,6 +9,14 @@ import { getWidgetMetadata } from "./config/csp.js";
 import { WordMorphGame } from "./games/wordMorph.js";
 import { LexiconSmithGame, type LetterSet } from "./games/lexiconSmith.js";
 import { TwentyQuestionsGame, type GameMode, type Category } from "./games/twentyQuestions.js";
+import {
+  ConnectionsGame,
+  getDailyPuzzle,
+  getRandomPuzzle,
+  type Puzzle,
+  type WordGroup,
+  type Difficulty,
+} from "./games/connections.js";
 import { getDailyWord } from "./data/wordLists.js";
 import {
   loadStreakData,
@@ -76,6 +84,15 @@ interface TwentyQuestionsSession {
 }
 
 /**
+ * Connections game session metadata.
+ */
+interface ConnectionsSession {
+  game: ConnectionsGame;
+  mode: "daily" | "practice";
+  userId: string;
+}
+
+/**
  * In-memory game state storage.
  * Maps session IDs to active Word Morph game sessions.
  */
@@ -92,6 +109,12 @@ const activeLexiconGames = new Map<string, LexiconSmithSession>();
  * Maps session IDs to active Twenty Questions game sessions.
  */
 const activeTwentyQuestionsGames = new Map<string, TwentyQuestionsSession>();
+
+/**
+ * In-memory Connections game state storage.
+ * Maps session IDs to active Connections game sessions.
+ */
+const activeConnectionsGames = new Map<string, ConnectionsSession>();
 
 /**
  * Default user ID for testing/demo purposes.
@@ -118,6 +141,13 @@ function generateLexiconSessionId(): string {
  */
 function generateTwentyQuestionsSessionId(): string {
   return `tq_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+}
+
+/**
+ * Generate a Connections session ID.
+ */
+function generateConnectionsSessionId(): string {
+  return `cn_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 }
 
 /**
@@ -564,6 +594,20 @@ function createGameBoxServer(): McpServer {
     },
     required: ["gameId", "guess"]
   };
+
+  // Connections schemas
+  const startConnectionsSchema = z.object({
+    mode: z.enum(["daily", "practice"]),
+  });
+
+  const submitConnectionsGuessSchema = z.object({
+    gameId: z.string(),
+    words: z.array(z.string()).length(4),
+  });
+
+  const shuffleConnectionsSchema = z.object({
+    gameId: z.string(),
+  });
 
   /**
    * Start a new Word Morph game.
@@ -1207,6 +1251,237 @@ Go ahead, ask your first question!
   );
 
   /**
+   * Start a new Connections game.
+   */
+  server.registerTool(
+    "gamebox.start_connections",
+    {
+      title: "Start Connections Game",
+      description:
+        "Use this when the user explicitly asks to play Connections, use the Connections connector, or launch the Connections app. This is a word grouping puzzle where users find 4 groups of 4 related words from a 4x4 grid. Do NOT use for other games - only when user specifically mentions Connections or wants to play a category matching game.",
+      inputSchema: startConnectionsSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/connections.html",
+        "openai/toolInvocation/invoking": "Starting Connections",
+        "openai/toolInvocation/invoked": "Connections ready! Find the groups.",
+      },
+    },
+    async (params: unknown) => {
+      const { mode } = startConnectionsSchema.parse(params);
+      const userId = DEFAULT_USER_ID;
+
+      const streakData = await loadStreakData(userId);
+
+      // Get puzzle based on mode
+      const puzzle = mode === "daily" ? getDailyPuzzle(new Date()) : getRandomPuzzle();
+
+      // Create new game
+      const game = new ConnectionsGame(puzzle);
+      const sessionId = generateConnectionsSessionId();
+      activeConnectionsGames.set(sessionId, { game, mode, userId });
+
+      const state = game.getState();
+      const modeLabel = mode === "daily" ? "Daily" : "Practice";
+
+      const welcomeMessage = `
+🎯 ${modeLabel} Connections Started!
+
+**How to Play:**
+- Find 4 groups of 4 related words
+- Select 4 words and submit your guess
+- Categories are color-coded by difficulty:
+  🟨 Yellow = Easiest
+  🟩 Green = Easy
+  🟦 Blue = Medium
+  🟪 Purple = Hardest
+- You have 4 mistakes before game over
+
+**Available Tools:**
+- \`gamebox.submit_connections_guess\` - Submit 4 words as a group
+- \`gamebox.shuffle_connections\` - Shuffle the grid
+
+**Your Stats:**
+- Current Streak: ${streakData.currentStreak}
+- Total Games: ${streakData.totalGamesPlayed}
+
+Mistakes remaining: ${game.getMistakesRemaining()}
+
+Find the connections!
+`.trim();
+
+      return {
+        content: [textContent(welcomeMessage)],
+        structuredContent: {
+          gameId: sessionId,
+          mode,
+          puzzleId: puzzle.id,
+          remainingWords: state.remainingWords,
+          solvedGroups: state.solvedGroups,
+          mistakeCount: state.mistakeCount,
+          mistakesRemaining: game.getMistakesRemaining(),
+          maxMistakes: state.maxMistakes,
+          status: state.status,
+          streak: streakData.currentStreak,
+          totalGamesPlayed: streakData.totalGamesPlayed,
+          winRate: calculateWinRate(streakData),
+        },
+      };
+    }
+  );
+
+  /**
+   * Submit a group guess in Connections.
+   */
+  server.registerTool(
+    "gamebox.submit_connections_guess",
+    {
+      title: "Submit Connections Guess",
+      description:
+        "Use this to submit a guess of 4 words that you think form a group in an active Connections game. Only use after gamebox.start_connections has been called.",
+      inputSchema: submitConnectionsGuessSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/connections.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId, words } = submitConnectionsGuessSchema.parse(params);
+
+      const session = activeConnectionsGames.get(gameId);
+      if (!session) {
+        return createErrorResponse(`Game not found: ${gameId}`);
+      }
+
+      const { game, mode, userId } = session;
+
+      try {
+        const result = game.submitGuess(words);
+        const state = game.getState();
+        let streakData = await loadStreakData(userId);
+
+        const difficultyEmoji: Record<Difficulty, string> = {
+          yellow: "🟨",
+          green: "🟩",
+          blue: "🟦",
+          purple: "🟪",
+        };
+
+        let message: string;
+        if (result.correct) {
+          message = `✅ Correct! ${difficultyEmoji[result.difficulty!]} **${result.category}**`;
+
+          if (state.status === "won") {
+            streakData = mode === "daily"
+              ? updateDailyStreak(streakData, true)
+              : updatePracticeStreak(streakData, true);
+            await saveStreakData(userId, streakData);
+            message += `\n\n🎉 **Congratulations!** You found all 4 groups!`;
+            message += `\n\n**Updated Stats:**\n- Current Streak: ${streakData.currentStreak}\n- Total Games: ${streakData.totalGamesPlayed}`;
+          }
+        } else {
+          message = result.wordsAway === 1
+            ? `❌ So close! You're **one word away** from a group.`
+            : `❌ Not a group. Mistakes: ${state.mistakeCount}/${state.maxMistakes}`;
+
+          if (state.status === "lost") {
+            streakData = mode === "daily"
+              ? updateDailyStreak(streakData, false)
+              : updatePracticeStreak(streakData, false);
+            await saveStreakData(userId, streakData);
+            const unsolved = game.getUnsolvedGroups();
+            message += `\n\n💔 **Game Over!** The remaining groups were:`;
+            for (const group of unsolved) {
+              message += `\n- ${group.category}: ${group.words.join(", ")}`;
+            }
+            message += `\n\n**Updated Stats:**\n- Current Streak: ${streakData.currentStreak}\n- Total Games: ${streakData.totalGamesPlayed}`;
+          }
+        }
+
+        return {
+          content: [textContent(message)],
+          structuredContent: {
+            gameId,
+            correct: result.correct,
+            category: result.category,
+            difficulty: result.difficulty,
+            wordsAway: result.wordsAway,
+            remainingWords: state.remainingWords,
+            solvedGroups: state.solvedGroups,
+            mistakeCount: state.mistakeCount,
+            mistakesRemaining: game.getMistakesRemaining(),
+            maxMistakes: state.maxMistakes,
+            status: state.status,
+            shareText: state.status !== "playing" ? game.generateShareText() : undefined,
+          },
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        return createErrorResponse(errorMessage);
+      }
+    }
+  );
+
+  /**
+   * Shuffle the Connections grid.
+   */
+  server.registerTool(
+    "gamebox.shuffle_connections",
+    {
+      title: "Shuffle Connections Grid",
+      description:
+        "Use this to shuffle the word grid in an active Connections game. Only use after gamebox.start_connections has been called.",
+      inputSchema: shuffleConnectionsSchema,
+      annotations: {
+        readOnlyHint: false,
+        openWorldHint: false,
+        destructiveHint: false,
+      },
+      _meta: {
+        "openai/outputTemplate": "ui://widget/connections.html",
+      },
+    },
+    async (params: unknown) => {
+      const { gameId } = shuffleConnectionsSchema.parse(params);
+
+      const session = activeConnectionsGames.get(gameId);
+      if (!session) {
+        return createErrorResponse(`Game not found: ${gameId}`);
+      }
+
+      const { game } = session;
+
+      try {
+        game.shuffle();
+        const state = game.getState();
+
+        return {
+          content: [textContent("🔀 Grid shuffled!")],
+          structuredContent: {
+            gameId,
+            remainingWords: state.remainingWords,
+            solvedGroups: state.solvedGroups,
+            mistakeCount: state.mistakeCount,
+            mistakesRemaining: game.getMistakesRemaining(),
+            status: state.status,
+          },
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "An error occurred";
+        return createErrorResponse(errorMessage);
+      }
+    }
+  );
+
+  /**
    * Show the GameBox menu.
    */
   server.registerTool(
@@ -1232,10 +1507,9 @@ Go ahead, ask your first question!
       structuredContent: {
         games: [
           { id: "word-morph", name: "Word Morph" },
-          { id: "twenty-queries", name: "Twenty Queries" },
-          { id: "kinship", name: "Kinship" },
+          { id: "connections", name: "Connections" },
+          { id: "twenty-questions", name: "Twenty Questions" },
           { id: "lexicon-smith", name: "Lexicon Smith" },
-          { id: "lore-master", name: "Lore Master" },
         ],
       },
     })

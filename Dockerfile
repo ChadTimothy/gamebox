@@ -29,7 +29,8 @@ RUN npm ci
 # Copy server source
 COPY server/ ./
 
-# Build server
+# Build server with increased memory
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Stage 3: Production image

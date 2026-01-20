@@ -26,11 +26,13 @@ COPY server/package*.json ./
 # Install dependencies
 RUN npm ci
 
+# Build server with increased memory (must be before COPY to invalidate cache)
+ENV NODE_OPTIONS="--max-old-space-size=8192"
+
 # Copy server source
 COPY server/ ./
 
-# Build server with increased memory
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+# Build server
 RUN npm run build
 
 # Stage 3: Production image

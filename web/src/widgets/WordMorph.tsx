@@ -14,49 +14,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useWidgetState } from "../hooks/useWidgetState.js";
 import { useOpenAiGlobal } from "../hooks/useOpenAiGlobal.js";
+import type {
+  LetterFeedback,
+  LetterResult,
+  GameStatus,
+  ToolOutput,
+} from "../types/game.js";
+import { Keyboard } from "../components/Keyboard.js";
 
 // Constants
 const MAX_GUESSES = 6;
 const WORD_LENGTH = 5;
-const KEYBOARD_ROWS = [
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-  ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACKSPACE"],
-] as const;
-
-/**
- * Letter feedback type matching server-side LetterFeedback.
- */
-type LetterFeedback = "correct" | "present" | "absent" | "empty";
-
-/**
- * Result for a single letter in a guess.
- */
-interface LetterResult {
-  letter: string;
-  feedback: LetterFeedback;
-}
-
-/**
- * Game status.
- */
-type GameStatus = "playing" | "won" | "lost";
-
-/**
- * Tool output from MCP server.
- */
-interface ToolOutput {
-  gameId?: string;
-  word?: string;
-  guesses?: string[];
-  result?: LetterFeedback[];
-  status?: GameStatus;
-  streak?: number;
-  maxStreak?: number;
-  totalGamesPlayed?: number;
-  winRate?: number;
-  message?: string;
-}
 
 /**
  * Widget state persisted across sessions.
@@ -213,72 +181,6 @@ function GameBoard({ guesses, results, currentGuess, status }: GameBoardProps): 
       {/* Remaining empty rows */}
       {Array.from({ length: Math.max(0, MAX_GUESSES - guesses.length - 1) }).map((_, i) => (
         <EmptyRow key={`empty-${i}`} />
-      ))}
-    </div>
-  );
-}
-
-interface KeyboardProps {
-  onKeyPress: (key: string) => void;
-  guessedLetters: Map<string, LetterFeedback>;
-}
-
-/**
- * Get Tailwind classes for keyboard key based on feedback.
- */
-function getKeyClasses(key: string, feedback: LetterFeedback | undefined): string {
-  // Special keys always use neutral colors
-  if (key === "ENTER" || key === "BACKSPACE") {
-    return "bg-gray-400 hover:bg-gray-500";
-  }
-
-  switch (feedback) {
-    case "correct":
-      return "word-morph-key-correct";
-    case "present":
-      return "word-morph-key-present";
-    case "absent":
-      return "word-morph-key-absent";
-    default:
-      return "bg-gray-300 hover:bg-gray-400";
-  }
-}
-
-/**
- * Get display text for a keyboard key.
- */
-function getKeyDisplay(key: string): string {
-  return key === "BACKSPACE" ? "\u232B" : key;
-}
-
-/**
- * Keyboard component - renders on-screen keyboard.
- */
-function Keyboard({ onKeyPress, guessedLetters }: KeyboardProps): JSX.Element {
-  const isWideKey = (key: string) => key === "ENTER" || key === "BACKSPACE";
-
-  return (
-    <div className="flex flex-col gap-2 mt-4">
-      {KEYBOARD_ROWS.map((row, i) => (
-        <div key={i} className="flex gap-1 justify-center">
-          {row.map((key) => (
-            <button
-              key={key}
-              onClick={() => {
-                onKeyPress(key);
-              }}
-              className={`
-                ${getKeyClasses(key, guessedLetters.get(key))}
-                ${isWideKey(key) ? "px-4" : "w-10"}
-                h-12 rounded-md font-bold text-sm
-                transition-colors duration-150
-                active:scale-95
-              `}
-            >
-              {getKeyDisplay(key)}
-            </button>
-          ))}
-        </div>
       ))}
     </div>
   );

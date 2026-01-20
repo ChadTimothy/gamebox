@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { WordMorph } from './widgets/WordMorph.js';
 import { TwentyQuestions } from './widgets/TwentyQuestions.js';
+import { Connections } from './widgets/Connections.js';
 import './styles/globals.css';
 
 // Get widget name from URL query parameter
@@ -13,6 +14,9 @@ let WidgetComponent: React.ComponentType;
 switch (widgetName) {
   case 'twenty-questions':
     WidgetComponent = TwentyQuestions;
+    break;
+  case 'connections':
+    WidgetComponent = Connections;
     break;
   case 'word-morph':
   default:

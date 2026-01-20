@@ -1355,62 +1355,54 @@ Find the connections!
     },
     async (params: unknown) => {
       const { gameId, words } = submitConnectionsGuessSchema.parse(params);
-      const userId = DEFAULT_USER_ID;
 
       const session = activeConnectionsGames.get(gameId);
       if (!session) {
         return createErrorResponse(`Game not found: ${gameId}`);
       }
 
-      const { game } = session;
+      const { game, mode, userId } = session;
 
       try {
         const result = game.submitGuess(words);
         const state = game.getState();
-        const streakData = await loadStreakData(userId);
+        let streakData = await loadStreakData(userId);
+
+        const difficultyEmoji: Record<Difficulty, string> = {
+          yellow: "🟨",
+          green: "🟩",
+          blue: "🟦",
+          purple: "🟪",
+        };
 
         let message: string;
         if (result.correct) {
-          const difficultyEmoji: Record<Difficulty, string> = {
-            yellow: "🟨",
-            green: "🟩",
-            blue: "🟦",
-            purple: "🟪",
-          };
           message = `✅ Correct! ${difficultyEmoji[result.difficulty!]} **${result.category}**`;
 
           if (state.status === "won") {
-            // Update streak data
-            if (session.mode === "daily") {
-              await updateDailyStreak(userId, true);
-            } else {
-              await updatePracticeStreak(userId, true);
-            }
-            const updatedStreak = await loadStreakData(userId);
+            streakData = mode === "daily"
+              ? updateDailyStreak(streakData, true)
+              : updatePracticeStreak(streakData, true);
+            await saveStreakData(userId, streakData);
             message += `\n\n🎉 **Congratulations!** You found all 4 groups!`;
-            message += `\n\n**Updated Stats:**\n- Current Streak: ${updatedStreak.currentStreak}\n- Total Games: ${updatedStreak.totalGamesPlayed}`;
+            message += `\n\n**Updated Stats:**\n- Current Streak: ${streakData.currentStreak}\n- Total Games: ${streakData.totalGamesPlayed}`;
           }
         } else {
-          if (result.wordsAway === 1) {
-            message = `❌ So close! You're **one word away** from a group.`;
-          } else {
-            message = `❌ Not a group. Mistakes: ${state.mistakeCount}/${state.maxMistakes}`;
-          }
+          message = result.wordsAway === 1
+            ? `❌ So close! You're **one word away** from a group.`
+            : `❌ Not a group. Mistakes: ${state.mistakeCount}/${state.maxMistakes}`;
 
           if (state.status === "lost") {
-            // Update streak data
-            if (session.mode === "daily") {
-              await updateDailyStreak(userId, false);
-            } else {
-              await updatePracticeStreak(userId, false);
-            }
-            const updatedStreak = await loadStreakData(userId);
+            streakData = mode === "daily"
+              ? updateDailyStreak(streakData, false)
+              : updatePracticeStreak(streakData, false);
+            await saveStreakData(userId, streakData);
             const unsolved = game.getUnsolvedGroups();
             message += `\n\n💔 **Game Over!** The remaining groups were:`;
             for (const group of unsolved) {
               message += `\n- ${group.category}: ${group.words.join(", ")}`;
             }
-            message += `\n\n**Updated Stats:**\n- Current Streak: ${updatedStreak.currentStreak}\n- Total Games: ${updatedStreak.totalGamesPlayed}`;
+            message += `\n\n**Updated Stats:**\n- Current Streak: ${streakData.currentStreak}\n- Total Games: ${streakData.totalGamesPlayed}`;
           }
         }
 

@@ -144,7 +144,9 @@ export class ConnectionsGame {
     // Record the guess
     this.guessHistory.push(words);
 
-    // Check if guess matches any unsolved group
+    // Check guess against unsolved groups and track closest match
+    let closestAway = 4;
+
     for (const group of this.puzzle.groups) {
       if (this.solvedGroups.includes(group)) {
         continue;
@@ -156,13 +158,10 @@ export class ConnectionsGame {
       if (matches === 4) {
         // Correct guess!
         this.solvedGroups.push(group);
-
-        // Remove solved words from remaining
         this.remainingWords = this.remainingWords.filter(
           (w) => !groupWords.includes(w.toUpperCase())
         );
 
-        // Check for win
         if (this.solvedGroups.length === 4) {
           this.status = "won";
         }
@@ -173,19 +172,9 @@ export class ConnectionsGame {
           difficulty: group.difficulty,
         };
       }
-    }
 
-    // Wrong guess - check for "one away" hint
-    let closestAway = 4;
-    for (const group of this.puzzle.groups) {
-      if (this.solvedGroups.includes(group)) {
-        continue;
-      }
-
-      const groupWords = group.words.map((w) => w.toUpperCase());
-      const matches = normalizedGuess.filter((w) => groupWords.includes(w)).length;
+      // Track closest match for "one away" hint
       const away = 4 - matches;
-
       if (away < closestAway) {
         closestAway = away;
       }
@@ -264,27 +253,19 @@ export class ConnectionsGame {
       purple: "🟪",
     };
 
-    let shareText = `Connections #${this.puzzle.id}\n`;
-
-    // Show guess history with colored squares
-    for (const guess of this.guessHistory) {
-      const normalizedGuess = guess.map((w) => w.toUpperCase());
-      let row = "";
-
-      // For each guess, show which difficulty each word belonged to
-      for (const word of normalizedGuess) {
-        for (const group of this.puzzle.groups) {
-          if (group.words.map((w) => w.toUpperCase()).includes(word)) {
-            row += difficultyEmoji[group.difficulty];
-            break;
-          }
-        }
+    // Build word-to-difficulty lookup for efficient share text generation
+    const wordToDifficulty = new Map<string, Difficulty>();
+    for (const group of this.puzzle.groups) {
+      for (const word of group.words) {
+        wordToDifficulty.set(word.toUpperCase(), group.difficulty);
       }
-
-      shareText += row + "\n";
     }
 
-    return shareText.trim();
+    const rows = this.guessHistory.map((guess) =>
+      guess.map((word) => difficultyEmoji[wordToDifficulty.get(word.toUpperCase())!]).join("")
+    );
+
+    return `Connections #${this.puzzle.id}\n${rows.join("\n")}`;
   }
 }
 

@@ -1,6 +1,8 @@
 # Node modules
 **/node_modules
-**/dist
+
+# Dist - keep server/dist for pre-built deployment
+web/dist
 
 # Testing
 **/__tests__

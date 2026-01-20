@@ -15,38 +15,29 @@ COPY web/ ./
 # Build web assets
 RUN npm run build
 
-# Stage 2: Build server
-FROM node:20-alpine AS server-builder
+# Stage 2: Server dependencies only (no build - use pre-built dist)
+FROM node:20-alpine AS server-deps
 
 WORKDIR /app/server
 
 # Copy server package files
 COPY server/package*.json ./
 
-# Install dependencies
-RUN npm ci
-
-# Build server with increased memory (must be before COPY to invalidate cache)
-ENV NODE_OPTIONS="--max-old-space-size=8192"
-
-# Copy server source
-COPY server/ ./
-
-# Build server
-RUN npm run build
+# Install production dependencies only
+RUN npm ci --omit=dev
 
 # Stage 3: Production image
 FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy built server
-COPY --from=server-builder /app/server/dist ./server/dist
-COPY --from=server-builder /app/server/package*.json ./server/
-COPY --from=server-builder /app/server/node_modules ./server/node_modules
+# Copy server with pre-built dist (built locally before deploy)
+COPY server/dist ./server/dist
+COPY server/package*.json ./server/
+COPY --from=server-deps /app/server/node_modules ./server/node_modules
 
 # Copy server data files (word lists, etc.)
-COPY --from=server-builder /app/server/src/data ./server/src/data
+COPY server/src/data ./server/src/data
 
 # Copy built web assets
 COPY --from=web-builder /app/web/dist ./web/dist
